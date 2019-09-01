@@ -9,8 +9,10 @@
 | Franco Santos                  |  francosantos874@gmail.com     | fransantt0s          |
 
 
-Fuentes Útiles
-Manejo de Branches (Ramas)
+###Fuentes Útiles
+
+###Manejo de Branches (Ramas)
+
 La idea es que utilicemos branches lo más posible para mantener una estructura de versionamiento estable.
 
 Por default, siempre vamos a estar posicionados en la rama origin/master, que será el tronco principal del versionamiento del código. En esta rama se mantendrá únicamente aquel código que ya ha sido testeado y del cual mantendremos siempre una versión funcional.
