@@ -61,13 +61,6 @@ class Kernel():
             HARDWARE.memory.write(firstEmptyAddrInMem, inst)
             firstEmptyAddrInMem += 1
 
-    def firstEmptyAddrInMem(self):
-        addr = 0
-        while HARDWARE.memory.read(addr) != '':
-            addr += 1
-        return addr
-
-
     ## emulates a "system call" for programs execution  
     def run(self, program):
         self.load_program(program)
@@ -81,16 +74,18 @@ class Kernel():
             HARDWARE.cpu.tick(i)
             sleep(1)
 
+    def firstEmptyAddrInMem(self):
+        # PRECONDICION: debe haber al menos una direccion vacia en memoria.
+        addr = 0
+        while HARDWARE.memory.read(addr) != '':
+            addr += 1
+        return addr
+
     def executeBatch(self, programs):
+        # PRECONDICION: la suma de todas las instrucciones de los programas pasados, debe ser menor o igual a la cantidad
+        #               de direcciones de memoria del sistema.
         for program in programs:
             self.run(program)
-
-    #self.emptyMemory(program)
-
-    #def emptyMemory(self,program):
-    #    progSize= len(program.instructions)
-    #    for index in range(0, progSize):
-    #        HARDWARE.memory.delete(index)
 
 
     def __repr__(self):
