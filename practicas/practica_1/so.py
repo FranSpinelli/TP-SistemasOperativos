@@ -55,9 +55,18 @@ class Kernel():
     def load_program(self, program):
         # loads the program in main memory  
         progSize = len(program.instructions)
+        firstEmptyAddrInMem = self.firstEmptyAddrInMem()
         for index in range(0, progSize):
             inst = program.instructions[index]
-            HARDWARE.memory.write(index, inst)
+            HARDWARE.memory.write(firstEmptyAddrInMem, inst)
+            firstEmptyAddrInMem += 1
+
+    def firstEmptyAddrInMem(self):
+        addr = 0
+        while HARDWARE.memory.read(addr) != '':
+            addr += 1
+        return addr
+
 
     ## emulates a "system call" for programs execution  
     def run(self, program):
@@ -71,6 +80,18 @@ class Kernel():
         for i in range(0, progSize):
             HARDWARE.cpu.tick(i)
             sleep(1)
+
+    def executeBatch(self, programs):
+        for program in programs:
+            self.run(program)
+
+    #self.emptyMemory(program)
+
+    #def emptyMemory(self,program):
+    #    progSize= len(program.instructions)
+    #    for index in range(0, progSize):
+    #        HARDWARE.memory.delete(index)
+
 
     def __repr__(self):
         return "Kernel "
