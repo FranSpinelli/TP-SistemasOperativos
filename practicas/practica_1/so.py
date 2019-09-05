@@ -33,7 +33,7 @@ class Program():
             else:
                 ## a single instr (a String)
                 expanded.append(i)
-            
+
         ## now test if last instruction is EXIT
         ## if not... add an EXIT as final instruction
         last = expanded[-1]
@@ -53,13 +53,13 @@ class Kernel():
 
 
     def load_program(self, program):
-        # loads the program in main memory  
+        # loads the program in main memory
         progSize = len(program.instructions)
         for index in range(0, progSize):
             inst = program.instructions[index]
             HARDWARE.memory.write(index, inst)
 
-    ## emulates a "system call" for programs execution  
+    ## emulates a "system call" for programs execution
     def run(self, program):
         self.load_program(program)
         log.logger.info("\n Executing program: {name}".format(name=program.name))
@@ -71,6 +71,10 @@ class Kernel():
         for i in range(0, progSize):
             HARDWARE.cpu.tick(i)
             sleep(1)
+
+    def executeBatch(self, batch):
+        for prog in batch:
+
 
     def __repr__(self):
         return "Kernel "
