@@ -74,6 +74,7 @@ class Kernel():
 
     def executeBatch(self, batch):
         for prog in batch:
+            self.run(prog)
 
 
     def __repr__(self):
