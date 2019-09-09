@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from hardware import *
+from queue import *
 import log
 
 
@@ -64,7 +65,15 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
     def execute(self, irq):
         log.logger.info(" Program Finished ")
         # por ahora apagamos el hardware porque estamos ejecutando un solo programa
-        HARDWARE.switchOff()
+
+        kernelsProgramQueue = self.kernel.programQueue
+
+        if kernelsProgramQueue.qsize() > 0:
+            self.kernel.run(kernelsProgramQueue.get_nowait())
+        else:
+            HARDWARE.switchOff()
+
+
 
 
 # emulates the core of an Operative System
@@ -72,8 +81,13 @@ class Kernel():
 
     def __init__(self):
         ## setup interruption handlers
+        self._programQueue = Queue()
         killHandler = KillInterruptionHandler(self)
         HARDWARE.interruptVector.register(KILL_INTERRUPTION_TYPE, killHandler)
+
+    @property
+    def programQueue(self):
+            return self._programQueue
 
     def load_program(self, program):
         # loads the program in main memory  
@@ -91,6 +105,15 @@ class Kernel():
         # set CPU program counter at program's first intruction
         HARDWARE.cpu.pc = 0
 
-
     def __repr__(self):
         return "Kernel "
+
+    def executeBatch(self, programs):
+        for program in programs:
+            self._programQueue.put_nowait(program)
+        self.run(self._programQueue.get_nowait())
+
+
+
+
+

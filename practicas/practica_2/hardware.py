@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-from tabulate import tabulate
+from threading import Thread
 from time import sleep
+
 import log
-from threading import Thread, Lock
+from tabulate import tabulate
 
 ##  Estas son la instrucciones soportadas por nuestro CPU
 INSTRUCTION_IO = 'IO'
