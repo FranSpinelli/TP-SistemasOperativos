@@ -21,7 +21,7 @@ if __name__ == '__main__':
     kernel = Kernel()
 
     ##  create a program
-    prg = Program("test.exe", [ASM.CPU(2), ASM.IO(), ASM.CPU(3), ASM.IO(), ASM.CPU(3)])
+    prg = Program("test.exe", [ASM.CPU(2), ASM.IO(), ASM.IO(), ASM.CPU(3), ASM.IO(), ASM.CPU(3)])
     
     # execute the program
     kernel.run(prg)
