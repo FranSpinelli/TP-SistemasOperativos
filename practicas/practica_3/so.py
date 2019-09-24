@@ -135,13 +135,6 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
             pcbAEjecutar.state = RUNNING_PCB_STATE
             self.kernel.dispatcher.load(pcbAEjecutar)
             self.kernel.pcbTable.runningPCB = pcbAEjecutar
-            
-
-        #pcb = {
-        #{'pc': HARDWARE.cpu.pc}
-        #HARDWARE.cpu.pc = -1  ## dejamos el CPU IDLE
-        #self.kernel.ioDeviceController.runOperation(pcb, operation)
-        #log.logger.info(self.kernel.ioDeviceController)
 
 
 class IoOutInterruptionHandler(AbstractInterruptionHandler):
@@ -167,7 +160,7 @@ class NewInterruptionHandler(AbstractInterruptionHandler):
     def execute(self, irq):
         baseDir = self._kernel.load_program(irq.parameters)
 
-        pcb = Pcb(baseDir, baseDir, irq.parameters.name)
+        pcb = Pcb(baseDir, 0, irq.parameters.name)
         pid = self._kernel.pcbTable.nuevoPid
 
         self._kernel.pcbTable.add(pcb, pid)
@@ -177,11 +170,8 @@ class NewInterruptionHandler(AbstractInterruptionHandler):
             self._kernel.pcbTable.runningPCB = pcb # lo tuve que hacer public por que decia que no puedo usar el setter
             self._kernel.dispatcher.load(pcb)
 
-        #self.kernel.load_program(irq.parameters)
         log.logger.info("\n Executing program: {name}".format(name=irq.parameters.name))
         log.logger.info(HARDWARE)
-        #HARDWARE.cpu.pc = 0
-
 
 # emulates the core of an Operative System
 class Kernel():
@@ -295,7 +285,7 @@ class PcbTable():
     def getfirstready(self):
         respuesta = None
         for(key,value) in self._pcbTable.items():
-            if value.state == READY_PCB_STATE & respuesta is None:
+            if (value.state == READY_PCB_STATE) & (respuesta is None):
                 respuesta = value
         return respuesta
 
@@ -338,11 +328,11 @@ class Dispatcher():
         self._mmu = unMMu
 
     def load(self, pcb):
-        self._cpu.pc = pcb.pc
-        self._mmu.baseDir = pcb.baseDir
+        self._cpu.pc = pcb.pc # no anda si uso el setter
+        self._mmu.baseDir = pcb.baseDir # no anda si uso el setter
 
     def save(self, pcb):
-        pcb.pc = self._cpu.pc
+        pcb.pc = self._cpu.pc # no anda si uso el setter
         self._cpu.pc = -1
 
 
