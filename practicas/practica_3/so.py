@@ -97,78 +97,76 @@ class AbstractInterruptionHandler():
 class KillInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
-        pcb = self.kernel.pcbTable.runningPCB
-        self.kernel.dispatcher.save(pcb)
-        pcb.state = TERMINATED_PCB_STATE
+        pcbTable = self.kernel.pcbTable
+        dispatcher = self.kernel.dispatcher
 
-        self.kernel.pcbTable.removerTerminados()
-        self.kernel.pcbTable.runningPCB = None
+        pcb = pcbTable.runningPCB
+        dispatcher.save_pcb(pcb)
+        pcb.state = TERMINATED_PCB_STATE #si uso el setter no funca
 
-        if self.kernel.pcbTable.hayAlgunProcesoEnReady():
+        pcbTable.remove_Terminateds()
+        pcbTable.runningPCB = None #si uso el setter no funca
 
-            pcbAEjecutar = self.kernel.pcbTable.getfirstready()
-            pcbAEjecutar.state = RUNNING_PCB_STATE
-            self.kernel.dispatcher.load(pcbAEjecutar)
-            self.kernel.pcbTable.runningPCB = pcbAEjecutar
+        if pcbTable.is_any_pcb_Ready():
 
-
-        #log.logger.info(" Program Finished ")
-        #HARDWARE.cpu.pc = -1  ## dejamos el CPU IDLE
-
+            pcbAEjecutar = pcbTable.get_first_pcb_ready()
+            pcbAEjecutar.state = RUNNING_PCB_STATE #si uso el setter no funca
+            dispatcher.load_pcb(pcbAEjecutar)
+            pcbTable.runningPCB = pcbAEjecutar #si uso el setter no funca
 
 class IoInInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
+        pcbTable = self.kernel.pcbTable
+        dispatcher = self.kernel.dispatcher
+
         operation = irq.parameters
 
-        pcb = self.kernel.pcbTable.runningPCB
-        self.kernel.pcbTable.runningPCB = None
-        self.kernel.dispatcher.save(pcb)
-        pcb.state = WAITING_PCB_STATE
+        pcb = pcbTable.runningPCB
+        pcbTable.runningPCB = None #si uso el setter no funca
+        dispatcher.save_pcb(pcb)
+        pcb.state = WAITING_PCB_STATE #si uso el setter no funca
 
         self.kernel.ioDeviceController.runOperation(pcb, operation)
         log.logger.info(self.kernel.ioDeviceController)
 
-        if self.kernel.pcbTable.hayAlgunProcesoEnReady():
+        if pcbTable.is_any_pcb_Ready():
 
-            pcbAEjecutar = self.kernel.pcbTable.getfirstready()
-            pcbAEjecutar.state = RUNNING_PCB_STATE
-            self.kernel.dispatcher.load(pcbAEjecutar)
-            self.kernel.pcbTable.runningPCB = pcbAEjecutar
-
+            pcbAEjecutar = pcbTable.get_first_pcb_ready()
+            pcbAEjecutar.state = RUNNING_PCB_STATE #si uso el setter no funca
+            dispatcher.load_pcb(pcbAEjecutar)
+            pcbTable.runningPCB = pcbAEjecutar #si uso el setter no funca
 
 class IoOutInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
+        pcbTable = self.kernel.pcbTable
+
         pcb = self.kernel.ioDeviceController.getFinishedPCB()
 
-        if self.kernel.pcbTable.runningPCB is None:
-            self.kernel.dispatcher.load(pcb)
+        if pcbTable.runningPCB is None:
+            self.kernel.dispatcher.load_program(pcb)
             pcb.state = RUNNING_PCB_STATE
-            self.kernel.pcbTable.runningPCB = pcb
+            pcbTable.runningPCB = pcb
         else:
             pcb.state = READY_PCB_STATE
-
-
-       # pcb = self.kernel.ioDeviceController.getFinishedPCB()
-       # HARDWARE.cpu.pc = pcb['pc']
-       # log.logger.info(self.kernel.ioDeviceController)
-
 
 class NewInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
+        pcbTable = self.kernel.pcbTable
+
         baseDir = self._kernel.load_program(irq.parameters)
 
         pcb = Pcb(baseDir, 0, irq.parameters.name)
-        pid = self._kernel.pcbTable.nuevoPid
+        pid = pcbTable.nuevoPid
 
-        self._kernel.pcbTable.add(pcb, pid)
+        pcbTable.add_pcb(pcb, pid)
 
-        if self._kernel.pcbTable.runningPCB is None:
+        if pcbTable.runningPCB is None:
             pcb.state = RUNNING_PCB_STATE #lo tuve que hacer public por que sino tira 'str' object is not callable
-            self._kernel.pcbTable.runningPCB = pcb # lo tuve que hacer public por que decia que no puedo usar el setter
-            self._kernel.dispatcher.load(pcb)
+            pcbTable.runningPCB = pcb # lo tuve que hacer public por que decia que no puedo usar el setter
+            self._kernel.dispatcher.load_pcb(pcb)
 
         log.logger.info("\n Executing program: {name}".format(name=irq.parameters.name))
         log.logger.info(HARDWARE)
@@ -219,7 +217,7 @@ class Kernel():
         return self._ioDeviceController
 
     def load_program(self, program):
-        return self._loader.load(program)
+        return self._loader.load_program(program)
 
     ## emulates a "system call" for programs execution
     def run(self, program):
@@ -282,34 +280,34 @@ class PcbTable():
         self._pidActual = self._pidActual + 1
         return valorARetornar
 
-    def getfirstready(self):
+    def get_first_pcb_ready(self):
         respuesta = None
         for(key,value) in self._pcbTable.items():
             if (value.state == READY_PCB_STATE) & (respuesta is None):
                 respuesta = value
         return respuesta
 
-    def hayAlgunProcesoEnReady(self):
+    def is_any_pcb_Ready(self):
         respuesta = False
         for (key,value) in self._pcbTable.items():
             if value.state == READY_PCB_STATE:
                 respuesta = True
         return respuesta
 
-    def removerTerminados(self):
+    def remove_Terminateds(self):
         new_dict = dict()
         for (key, value) in self._pcbTable.items():
             if value.state != TERMINATED_PCB_STATE:
                 new_dict[key] = value
         self._pcbTable = new_dict
 
-    def get(self, pid):
+    def get_pcb(self, pid):
         return self._pcbTable[pid]
 
-    def add(self, pcb, pID):
+    def add_pcb(self, pcb, pID):
         self._pcbTable[pID] = pcb
 
-    def remove(self, pid):
+    def remove_pcb(self, pid):
         self._pcbTable.pop(pid)
 
     # @property
@@ -327,11 +325,11 @@ class Dispatcher():
         self._cpu = unCPU
         self._mmu = unMMu
 
-    def load(self, pcb):
+    def load_pcb(self, pcb):
         self._cpu.pc = pcb.pc # no anda si uso el setter
         self._mmu.baseDir = pcb.baseDir # no anda si uso el setter
 
-    def save(self, pcb):
+    def save_pcb(self, pcb):
         pcb.pc = self._cpu.pc # no anda si uso el setter
         self._cpu.pc = -1
 
@@ -341,7 +339,7 @@ class Loader():
     def __init__(self):
         self._baseDir = 0
 
-    def load(self, program):
+    def load_program(self, program):
         ## loads the program in main memory
         baseDirdelPrograma = self._baseDir
         primeraDireccioLibre = self._baseDir

@@ -905,7 +905,7 @@ def _normalize_tabular_data(tabular_data, headers, showindex="default"):
                     headers = []
             elif headers:
                 raise ValueError('headers for a list of dicts is not a dict or a keyword')
-            rows = [[row.get(k) for k in keys] for row in rows]
+            rows = [[row.get_pcb(k) for k in keys] for row in rows]
 
         elif (headers == "keys"
               and hasattr(tabular_data, "description")
