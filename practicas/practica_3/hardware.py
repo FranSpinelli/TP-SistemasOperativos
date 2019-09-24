@@ -165,6 +165,7 @@ class MMU():
             raise Exception("Invalid Address,  {logicalAddress} is higher than process limit: {limit}".format(limit = self._limit, logicalAddress = logicalAddress))
 
         physicalAddress = logicalAddress + self._baseDir
+        #log.logger.info("PhysicalAddres={physicalAddr}".format(physicalAddr=physicalAddress))
         return self._memory.read(physicalAddress)
 
 
@@ -203,7 +204,7 @@ class Cpu():
             ioInIRQ = IRQ(IO_IN_INTERRUPTION_TYPE, self._ir)
             self._interruptVector.handle(ioInIRQ)
         else:
-            log.logger.info("cpu - Exec: {instr}, PC={pc}".format(instr=self._ir, pc=self._pc))
+            log.logger.info("cpu - Exec: {instr}, PC={pc}, ".format(instr=self._ir, pc=self._pc))
 
     @property
     def pc(self):

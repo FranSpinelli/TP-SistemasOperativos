@@ -109,7 +109,7 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
             pcbAEjecutar = self.kernel.pcbTable.getfirstready()
             pcbAEjecutar.state = RUNNING_PCB_STATE
             self.kernel.dispatcher.load(pcbAEjecutar)
-            pcb.kernel.pcbTable.runningPCB = pcbAEjecutar
+            self.kernel.pcbTable.runningPCB = pcbAEjecutar
 
 
         #log.logger.info(" Program Finished ")
