@@ -13,9 +13,6 @@ if __name__ == '__main__':
     ## setup our hardware and set memory size to 25 "cells"
     HARDWARE.setup(25)
 
-    ## Switch on computer
-    HARDWARE.switchOn()
-
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo
     kernel = Kernel()

@@ -104,12 +104,12 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
         dispatcher.save_pcb(pcb)
         pcb.state = TERMINATED_PCB_STATE #si uso el setter no funca
 
-        pcbTable.remove_Terminateds()
+        pcbTable.remove_pcb(pcb.pid)
         pcbTable.runningPCB = None #si uso el setter no funca
 
-        if pcbTable.is_any_pcb_Ready():
+        if not self.kernel.readyQueue.isEmpty():
 
-            pcbAEjecutar = pcbTable.get_first_pcb_ready()
+            pcbAEjecutar = self.kernel.readyQueue.getProceso()
             pcbAEjecutar.state = RUNNING_PCB_STATE #si uso el setter no funca
             dispatcher.load_pcb(pcbAEjecutar)
             pcbTable.runningPCB = pcbAEjecutar #si uso el setter no funca
@@ -119,6 +119,7 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
     def execute(self, irq):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
+        readyQueue = self.kernel.readyQueue
 
         operation = irq.parameters
 
@@ -130,9 +131,9 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
         self.kernel.ioDeviceController.runOperation(pcb, operation)
         log.logger.info(self.kernel.ioDeviceController)
 
-        if pcbTable.is_any_pcb_Ready():
+        if not readyQueue.isEmpty():
 
-            pcbAEjecutar = pcbTable.get_first_pcb_ready()
+            pcbAEjecutar = readyQueue.getProceso()
             pcbAEjecutar.state = RUNNING_PCB_STATE #si uso el setter no funca
             dispatcher.load_pcb(pcbAEjecutar)
             pcbTable.runningPCB = pcbAEjecutar #si uso el setter no funca
@@ -145,28 +146,33 @@ class IoOutInterruptionHandler(AbstractInterruptionHandler):
         pcb = self.kernel.ioDeviceController.getFinishedPCB()
 
         if pcbTable.runningPCB is None:
-            self.kernel.dispatcher.load_program(pcb)
+            self.kernel.dispatcher.load_pcb(pcb)
             pcb.state = RUNNING_PCB_STATE
             pcbTable.runningPCB = pcb
         else:
+            self.kernel.readyQueue.agregarProceso(pcb)
             pcb.state = READY_PCB_STATE
 
 class NewInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
         pcbTable = self.kernel.pcbTable
+        readyQueue = self.kernel.readyQueue
 
         baseDir = self._kernel.load_program(irq.parameters)
 
-        pcb = Pcb(baseDir, 0, irq.parameters.name)
         pid = pcbTable.nuevoPid
+        pcb = Pcb(pid, baseDir, 0, irq.parameters.name)
 
-        pcbTable.add_pcb(pcb, pid)
+        pcbTable.add_pcb(pcb)
 
         if pcbTable.runningPCB is None:
             pcb.state = RUNNING_PCB_STATE #lo tuve que hacer public por que sino tira 'str' object is not callable
             pcbTable.runningPCB = pcb # lo tuve que hacer public por que decia que no puedo usar el setter
+
             self._kernel.dispatcher.load_pcb(pcb)
+        else:
+            readyQueue.agregarProceso(pcb)
 
         log.logger.info("\n Executing program: {name}".format(name=irq.parameters.name))
         log.logger.info(HARDWARE)
@@ -198,7 +204,13 @@ class Kernel():
         self._loader = Loader()
 
         ##helps kernel to keep process state
-        self._pcbTable = PcbTable();
+        self._pcbTable = PcbTable()
+
+        self._readyQueue = readyQueue()
+
+    @property
+    def readyQueue(self):
+        return  self._readyQueue
 
     @property
     def pcbTable(self):
@@ -237,15 +249,21 @@ TERMINATED_PCB_STATE = "#terminated"
 
 class Pcb():
 
-    def __init__(self, unaBaseDir, unPC, unPath):
+    def __init__(self, pid, unaBaseDir, unPC, unPath):
+        self._pid = pid
         self._baseDir = unaBaseDir
         self._pc = unPC
         self._path = unPath
-        self.state = READY_PCB_STATE
+        self._state = READY_PCB_STATE
+
+    @property
+    def pid(self):
+        return self._pid
 
     @property
     def baseDir(self):
         return self._baseDir
+
     @property
     def pc(self):
         return self._pc
@@ -254,13 +272,13 @@ class Pcb():
     def path(self):
         return self._path
 
-    #@property
-    #def state(self):
-    #    return self._state
+    @property
+    def state(self):
+        return self._state
 
-    #@state.setter
-    #def state(self, nuevoState):
-    #    self._state = nuevoState
+    @state.setter
+    def state(self, nuevoState):
+        self._state = nuevoState
 
     @pc.setter
     def pc(self, nuevoPC):
@@ -271,7 +289,7 @@ class PcbTable():
 
     def __init__(self):
         self._pidActual = 0
-        self._pcbTable = dict()
+        self._pcbTable = []
         self.runningPCB = None
 
     @property
@@ -280,43 +298,47 @@ class PcbTable():
         self._pidActual = self._pidActual + 1
         return valorARetornar
 
-    def get_first_pcb_ready(self):
-        respuesta = None
-        for(key,value) in self._pcbTable.items():
-            if (value.state == READY_PCB_STATE) & (respuesta is None):
-                respuesta = value
-        return respuesta
+    #def get_first_pcb_ready(self):
+    #    respuesta = None
+    #    for(key,value) in self._pcbTable.items():
+    #        if (value.state == READY_PCB_STATE) & (respuesta is None):
+    #            respuesta = value
+    #    return respuesta
 
-    def is_any_pcb_Ready(self):
-        respuesta = False
-        for (key,value) in self._pcbTable.items():
-            if value.state == READY_PCB_STATE:
-                respuesta = True
-        return respuesta
+    #def is_any_pcb_Ready(self):
+    #    respuesta = False
+    #    for (key,value) in self._pcbTable.items():
+    #        if value.state == READY_PCB_STATE:
+    #            respuesta = True
+    #    return respuesta
 
     def remove_Terminateds(self):
-        new_dict = dict()
-        for (key, value) in self._pcbTable.items():
-            if value.state != TERMINATED_PCB_STATE:
-                new_dict[key] = value
-        self._pcbTable = new_dict
+        new_list = []
+        for pcb in self._pcbTable.items():
+            if pcb.state != TERMINATED_PCB_STATE:
+                new_list.append(pcb)
+        self._pcbTable = new_list
 
     def get_pcb(self, pid):
         return self._pcbTable[pid]
 
-    def add_pcb(self, pcb, pID):
-        self._pcbTable[pID] = pcb
+    def add_pcb(self, pcb):
+        self._pcbTable.append(pcb)
 
     def remove_pcb(self, pid):
-        self._pcbTable.pop(pid)
+        new_list = []
+        for pcb in self._pcbTable:
+            if pcb.pid != pid:
+                new_list.append(pcb)
+        self._pcbTable = new_list
 
-    # @property
-    # def runningPCB(self):
-    #    return self._runningPCB
+    @property
+    def runningPCB(self):
+        return self._runningPCB
 
-    # @runningPCB.setter
-    # def runningPCB(self, nuevorunningpcb):
-    #    self._runningPCB = nuevorunningpcb
+    @runningPCB.setter
+    def runningPCB(self, nuevorunningpcb):
+        self._runningPCB = nuevorunningpcb
 
 
 class Dispatcher():
@@ -350,3 +372,17 @@ class Loader():
             primeraDireccioLibre = primeraDireccioLibre + 1  ##WTF pasa si hago primeraDirLibre=+1???
         self._baseDir = primeraDireccioLibre
         return baseDirdelPrograma
+
+class readyQueue():
+
+    def __init__(self):
+        self._queue = []
+
+    def agregarProceso(self, proceso):
+        self._queue.append(proceso)
+
+    def getProceso(self):
+        return self._queue.pop(0)
+
+    def isEmpty(self):
+        return len(self._queue) == 0

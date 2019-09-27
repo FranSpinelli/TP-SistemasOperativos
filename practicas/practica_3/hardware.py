@@ -165,7 +165,7 @@ class MMU():
             raise Exception("Invalid Address,  {logicalAddress} is higher than process limit: {limit}".format(limit = self._limit, logicalAddress = logicalAddress))
 
         physicalAddress = logicalAddress + self._baseDir
-        #log.logger.info("PhysicalAddres={physicalAddr}".format(physicalAddr=physicalAddress))
+        log.logger.info("PhysicalAddres={physicalAddr}".format(physicalAddr=physicalAddress))
         return self._memory.read(physicalAddress)
 
 
