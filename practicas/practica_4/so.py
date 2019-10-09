@@ -99,6 +99,7 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
     def execute(self, irq):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
+        scheduler = self.kernel.scheduler
 
         pcb = pcbTable.runningPCB
         dispatcher.save_pcb(pcb)
@@ -107,19 +108,19 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
         pcbTable.remove_pcb(pcb.pid)
         pcbTable.runningPCB = None
 
-        if not self.kernel.readyQueue.isEmpty():
-
-            pcbAEjecutar = self.kernel.readyQueue.getProceso()
+        if not scheduler.readyQueueIsEmpty():
+            pcbAEjecutar = scheduler.getPcb()
             pcbAEjecutar.state = RUNNING_PCB_STATE
             dispatcher.load_pcb(pcbAEjecutar)
             pcbTable.runningPCB = pcbAEjecutar
+
 
 class IoInInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
-        readyQueue = self.kernel.readyQueue
+        scheduler = self.kernel.scheduler
 
         operation = irq.parameters
 
@@ -131,12 +132,12 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
         self.kernel.ioDeviceController.runOperation(pcb, operation)
         log.logger.info(self.kernel.ioDeviceController)
 
-        if not readyQueue.isEmpty():
-
-            pcbAEjecutar = readyQueue.getProceso()
+        if not scheduler.readyQueueIsEmpty():
+            pcbAEjecutar = scheduler.getPcb()
             pcbAEjecutar.state = RUNNING_PCB_STATE
             dispatcher.load_pcb(pcbAEjecutar)
             pcbTable.runningPCB = pcbAEjecutar
+
 
 class IoOutInterruptionHandler(AbstractInterruptionHandler):
 
@@ -146,18 +147,20 @@ class IoOutInterruptionHandler(AbstractInterruptionHandler):
         pcb = self.kernel.ioDeviceController.getFinishedPCB()
 
         if pcbTable.runningPCB is None:
-            self.kernel.dispatcher.load_pcb(pcb)
             pcb.state = RUNNING_PCB_STATE
             pcbTable.runningPCB = pcb
+
+            self.kernel.dispatcher.load_pcb(pcb)
         else:
-            self.kernel.readyQueue.agregarProceso(pcb)
             pcb.state = READY_PCB_STATE
+            self.kernel.scheduler.addToReadyQueue(pcb)
+
 
 class NewInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
         pcbTable = self.kernel.pcbTable
-        readyQueue = self.kernel.readyQueue
+        scheduler = self.kernel.scheduler
 
         baseDir = self._kernel.load_program(irq.parameters)
 
@@ -172,15 +175,38 @@ class NewInterruptionHandler(AbstractInterruptionHandler):
 
             self._kernel.dispatcher.load_pcb(pcb)
         else:
-            readyQueue.agregarProceso(pcb)
+            scheduler.addToReadyQueue(pcb)
 
         log.logger.info("\n Executing program: {name}".format(name=irq.parameters.name))
         log.logger.info(HARDWARE)
 
+
+class TimeOutInterruptionHandler(AbstractInterruptionHandler):
+
+    def execute(self, irq):
+        pcbTable = self.kernel.pcbTable
+        dispatcher = self.kernel.dispatcher
+        scheduler = self.kernel.scheduler
+
+        if not scheduler.readyQueueIsEmpty():
+            pcb = pcbTable.runningPCB
+            pcbTable.runningPCB = None
+            dispatcher.save_pcb(pcb)
+            pcb.state = WAITING_PCB_STATE
+            scheduler.addToReadyQueue(pcb)
+
+            pcbAEjecutar = scheduler.getPcb()
+            pcbAEjecutar.state = RUNNING_PCB_STATE
+            dispatcher.load_pcb(pcbAEjecutar)
+            pcbTable.runningPCB = pcbAEjecutar
+        else:
+            HARDWARE.timer.reset()
+
+
 # emulates the core of an Operative System
 class Kernel():
 
-    def __init__(self):
+    def __init__(self, schedulerToUse):
         ## setup interruption handlers
         killHandler = KillInterruptionHandler(self)
         HARDWARE.interruptVector.register(KILL_INTERRUPTION_TYPE, killHandler)
@@ -194,6 +220,9 @@ class Kernel():
         newHandler = NewInterruptionHandler(self)
         HARDWARE.interruptVector.register(NEW_INTERRUPTION_TYPE, newHandler)
 
+        timeOutHandler = TimeOutInterruptionHandler(self)
+        HARDWARE.interruptVector.register(TIMEOUT_INTERRUPTION_TYPE, timeOutHandler)
+
         ## controls the Hardware's I/O Device
         self._ioDeviceController = IoDeviceController(HARDWARE.ioDevice)
 
@@ -206,11 +235,13 @@ class Kernel():
         ##helps kernel to keep process state
         self._pcbTable = PcbTable()
 
-        self._readyQueue = readyQueue()
+        ##the scheduler with which the kernel will work
+        self._scheduler = schedulerToUse
+        self.scheduler.setUpTimer()  # set up the timer of the system with the quantum that the scheduler has
 
     @property
-    def readyQueue(self):
-        return  self._readyQueue
+    def scheduler(self):
+        return self._scheduler
 
     @property
     def pcbTable(self):
@@ -327,8 +358,9 @@ class Dispatcher():
         self._mmu = unMMu
 
     def load_pcb(self, pcb):
-        self._cpu.pc = pcb.pc # no anda si uso el setter
+        self._cpu.pc = pcb.pc
         self._mmu.baseDir = pcb.baseDir
+        HARDWARE.timer.reset()
 
     def save_pcb(self, pcb):
         pcb.pc = self._cpu.pc
@@ -352,16 +384,56 @@ class Loader():
         self._baseDir = primeraDireccioLibre
         return baseDirdelPrograma
 
-class readyQueue():
+
+class AbstractScheduler():
 
     def __init__(self):
-        self._queue = []
+        self._readyQueue = []
 
-    def agregarProceso(self, proceso):
-        self._queue.append(proceso)
+    def setUpTimer(self):
+        log.logger.error(
+            "-- setUpTimer MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
-    def getProceso(self):
-        return self._queue.pop(0)
+    def addToReadyQueue(self, pcb):
+        log.logger.error(
+            "-- addToReadyQueue MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
-    def isEmpty(self):
-        return len(self._queue) == 0
+    def readyQueueIsEmpty(self):
+        log.logger.error(
+            "-- readyQueueIsEmpty MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
+
+    def getPcb(self):
+        log.logger.error("-- getPcb MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
+
+
+class RoundRobinScheduler(AbstractScheduler):
+
+    def __init__(self, quantum):
+        self._quantum = quantum
+        super(RoundRobinScheduler, self).__init__()
+
+    def setUpTimer(self):
+        HARDWARE.timer.quantum = self._quantum
+
+    def addToReadyQueue(self, pcb):
+        self._readyQueue.append(pcb)
+
+    def readyQueueIsEmpty(self):
+        return not self._readyQueue
+
+    def getPcb(self):
+        return self._readyQueue.pop(0)
+
+class FCFSScheduler(AbstractScheduler):
+
+    def setUpTimer(self):
+        pass
+
+    def addToReadyQueue(self, pcb):
+        self._readyQueue.append(pcb)
+
+    def readyQueueIsEmpty(self):
+        return not self._readyQueue
+
+    def getPcb(self):
+        return self._readyQueue.pop(0)
