@@ -17,8 +17,8 @@ if __name__ == '__main__':
     HARDWARE.switchOn()
 
     ##creamos el scheduler con el que vamos a trabajar
-    #scheduler = RoundRobinScheduler(2) ##en el constructor del RoundRobinScheduler se le indica el Quantum con el que se va a trabajar
-    scheduler = FCFSScheduler()
+    scheduler = RoundRobinScheduler(2) ##en el constructor del RoundRobinScheduler se le indica el Quantum con el que se va a trabajar
+    #scheduler = FCFSScheduler()
 
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo con el scheduler a utilizar
