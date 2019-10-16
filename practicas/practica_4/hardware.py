@@ -68,10 +68,10 @@ class InterruptVector():
     def register(self, interruptionType, interruptionHandler):
         self._handlers[interruptionType] = interruptionHandler
 
-    def handle(self, irq):
+    def handle(self, irq, priority):
         log.logger.info("Handling {type} irq with parameters = {parameters}".format(type=irq.type, parameters=irq.parameters ))
         self.lock.acquire()
-        self._handlers[irq.type].execute(irq)
+        self._handlers[irq.type].execute(irq, priority)
         self.lock.release()
 
 
@@ -196,10 +196,10 @@ class Cpu():
     def _execute(self):
         if ASM.isEXIT(self._ir):
             killIRQ = IRQ(KILL_INTERRUPTION_TYPE)
-            self._interruptVector.handle(killIRQ)
+            self._interruptVector.handle(killIRQ, 1) ## LE PUSE UNA CONSTANTE PARA QUE ANDE PERO NO SE COMO MIERDA PASARLE LA PRIORIDAD
         elif ASM.isIO(self._ir):
             ioInIRQ = IRQ(IO_IN_INTERRUPTION_TYPE, self._ir)
-            self._interruptVector.handle(ioInIRQ)
+            self._interruptVector.handle(ioInIRQ, 2) ## LE PUSE UNA CONSTANTE PARA QUE ANDE PERO NO SE COMO MIERDA PASARLE LA PRIORIDAD
         else:
             log.logger.info("cpu - Exec: {instr}, PC={pc}".format(instr=self._ir, pc=self._pc))
 
@@ -274,14 +274,14 @@ class Timer:
         self._quantum = 0   # por default esta desactivado
 
     def tick(self, tickNbr):
-        # registro que el proceso en CPU corrio un ciclo mas 
+        # registro que el proceso en CPU corrio un ciclo mas
         self._tickCount += 1
         if self._active and (self._tickCount > self._quantum) and self._cpu.isBusy():
             # se “cumplio” el limite de ejecuciones
             timeoutIRQ = IRQ(TIMEOUT_INTERRUPTION_TYPE)
             self._interruptVector.handle(timeoutIRQ)
         else:
-            self._cpu.tick(tickNbr) 
+            self._cpu.tick(tickNbr)
 
     def reset(self):
            self._tickCount = 0
@@ -354,4 +354,3 @@ class Hardware():
 ### HARDWARE is a global variable
 ### can be access from any
 HARDWARE = Hardware()
-

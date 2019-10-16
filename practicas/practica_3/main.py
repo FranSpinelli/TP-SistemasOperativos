@@ -4,7 +4,7 @@ import log
 
 
 ##
-##  MAIN 
+##  MAIN
 ##
 if __name__ == '__main__':
     log.setupLogger()
@@ -34,9 +34,3 @@ if __name__ == '__main__':
 
     ## start
     HARDWARE.switchOn()
-
-
-
-
-
-

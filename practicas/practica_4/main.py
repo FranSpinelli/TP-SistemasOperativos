@@ -4,7 +4,7 @@ import log
 
 
 ##
-##  MAIN 
+##  MAIN
 ##
 if __name__ == '__main__':
     log.setupLogger()
@@ -35,10 +35,6 @@ if __name__ == '__main__':
     prg3 = Program("prg3.exe", [ASM.CPU(3)])
 
     # execute all programs "concurrently"
-    kernel.run(prg1)
-    kernel.run(prg2)
-    kernel.run(prg3)
-
-
-
-
+    kernel.run(prg1, 1)
+    kernel.run(prg2, 2)
+    kernel.run(prg3, 3)
