@@ -105,7 +105,7 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
         dispatcher.save_pcb(pcb)
         pcb.state = TERMINATED_PCB_STATE
 
-        pcbTable.remove_pcb(pcb.pid)
+        #pcbTable.remove_pcb(pcb.pid)
         pcbTable.runningPCB = None
 
         if not scheduler.readyQueueIsEmpty():
@@ -329,6 +329,10 @@ class PcbTable():
         self._pidActual = self._pidActual + 1
         return valorARetornar
 
+    @property
+    def pcbTable(self):
+        return self._pcbTable
+
     def get_pcb(self, pid):
         return self._pcbTable[pid]
 
@@ -380,7 +384,7 @@ class Loader():
         for index in range(0, progSize):
             inst = program.instructions[index]
             HARDWARE.memory.write(primeraDireccioLibre, inst)
-            primeraDireccioLibre = primeraDireccioLibre + 1  ##WTF pasa si hago primeraDirLibre=+1???
+            primeraDireccioLibre = primeraDireccioLibre + 1
         self._baseDir = primeraDireccioLibre
         return baseDirdelPrograma
 
@@ -424,6 +428,7 @@ class RoundRobinScheduler(AbstractScheduler):
     def getPcb(self):
         return self._readyQueue.pop(0)
 
+
 class FCFSScheduler(AbstractScheduler):
 
     def setUpTimer(self):
@@ -437,3 +442,52 @@ class FCFSScheduler(AbstractScheduler):
 
     def getPcb(self):
         return self._readyQueue.pop(0)
+
+
+# -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
+
+class GantGraficator():
+
+    def __init__(self, kernel):
+        self._kernel = kernel
+        self._representacionDeEjecucion = []
+        self._headers = ["procesos"]
+
+    def tick(self, ticknmbr):
+        if ticknmbr == 1:
+            self._representacionDeEjecucion = self.armarCuadro(self._kernel.pcbTable.pcbTable)
+            self.actualizarRepresentacion(ticknmbr,self._kernel.pcbTable.pcbTable)
+
+        if ticknmbr > 1:
+            self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
+
+        log.logger.info(self.__repr__())
+
+    def actualizarRepresentacion(self,ticknmbr, pcbTable):
+        self._headers.append(ticknmbr)
+
+        nroDeProceso = 0
+        for pcb in pcbTable:
+            valorARetornar = "Dead"
+
+            if pcb.state == RUNNING_PCB_STATE:
+                valorARetornar = "Running"
+            if pcb.state == READY_PCB_STATE:
+                valorARetornar = "Ready"
+            if pcb.state == WAITING_PCB_STATE:
+                valorARetornar = "W"
+
+            self._representacionDeEjecucion[nroDeProceso].append(valorARetornar)
+
+            nroDeProceso = nroDeProceso + 1
+
+    def armarCuadro(self,pcbTable):
+        listaAEntregar = []
+        for pcb in pcbTable:
+            listaAEntregar.append([pcb.path])
+        return listaAEntregar
+
+
+
+    def __repr__(self):
+        return tabulate(self._representacionDeEjecucion, headers=self._headers, tablefmt='grid', stralign='center')
