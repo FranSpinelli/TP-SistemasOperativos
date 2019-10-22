@@ -90,23 +90,39 @@ class AbstractInterruptionHandler():
     def kernel(self):
         return self._kernel
 
-    def execute(self, irq, priority):
+    def execute(self, irq):
         log.logger.error("-- EXECUTE MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
-
-class KillInterruptionHandler(AbstractInterruptionHandler):
-
-    def execute(self, irq, priority):
+    def pcbIn(self, pcb):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
         scheduler = self.kernel.scheduler
 
-        pcb = pcbTable.runningPCB
-        dispatcher.save_pcb(pcb)
-        pcb.state = TERMINATED_PCB_STATE
+        if pcbTable.runningPCB is None:
+            pcb.state = RUNNING_PCB_STATE
+            pcbTable.runningPCB = pcb
 
-        pcbTable.remove_pcb(pcb.pid)
-        pcbTable.runningPCB = None
+            dispatcher.load_pcb(pcb)
+
+        else:
+            if scheduler.mustExpropiate(pcb, pcbTable.runningPCB):
+                pcbRunning = pcbTable.runningPCB
+                pcbTable.runningPCB = None
+                dispatcher.save_pcb(pcbRunning)
+                pcbRunning.state = READY_PCB_STATE
+                scheduler.addToReadyQueue(pcbRunning)
+
+                dispatcher.load_pcb(pcb)
+                pcbTable.runningPCB = pcb
+                pcb.state = RUNNING_PCB_STATE
+            else:
+                pcb.state = READY_PCB_STATE
+                scheduler.addToReadyQueue(pcb)
+
+    def pcbOut(self):
+        pcbTable = self.kernel.pcbTable
+        dispatcher = self.kernel.dispatcher
+        scheduler = self.kernel.scheduler
 
         if not scheduler.readyQueueIsEmpty():
             pcbAEjecutar = scheduler.getPcb()
@@ -115,12 +131,26 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
             pcbTable.runningPCB = pcbAEjecutar
 
 
-class IoInInterruptionHandler(AbstractInterruptionHandler):
+class KillInterruptionHandler(AbstractInterruptionHandler):
 
-    def execute(self, irq, priority):
+    def execute(self, irq):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
-        scheduler = self.kernel.scheduler
+
+        pcb = pcbTable.runningPCB
+        dispatcher.save_pcb(pcb)
+        pcb.state = TERMINATED_PCB_STATE
+
+        pcbTable.remove_pcb(pcb.pid)
+        pcbTable.runningPCB = None
+
+        self.pcbOut()
+
+class IoInInterruptionHandler(AbstractInterruptionHandler):
+
+    def execute(self, irq):
+        pcbTable = self.kernel.pcbTable
+        dispatcher = self.kernel.dispatcher
 
         operation = irq.parameters
 
@@ -132,58 +162,42 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
         self.kernel.ioDeviceController.runOperation(pcb, operation)
         log.logger.info(self.kernel.ioDeviceController)
 
-        if not scheduler.readyQueueIsEmpty():
-            pcbAEjecutar = scheduler.getPcb()
-            pcbAEjecutar.state = RUNNING_PCB_STATE
-            dispatcher.load_pcb(pcbAEjecutar)
-            pcbTable.runningPCB = pcbAEjecutar
+        self.pcbOut()
 
 
 class IoOutInterruptionHandler(AbstractInterruptionHandler):
 
-    def execute(self, irq, priority):
-        pcbTable = self.kernel.pcbTable
+    def execute(self, irq):
 
         pcb = self.kernel.ioDeviceController.getFinishedPCB()
 
-        if pcbTable.runningPCB is None:
-            pcb.state = RUNNING_PCB_STATE
-            pcbTable.runningPCB = pcb
-
-            self.kernel.dispatcher.load_pcb(pcb)
-        else:
-            pcb.state = READY_PCB_STATE
-            self.kernel.scheduler.addToReadyQueue(pcb)
+        self.pcbIn(pcb)
 
 
 class NewInterruptionHandler(AbstractInterruptionHandler):
 
-    def execute(self, irq, priority):
-        pcbTable = self.kernel.pcbTable
-        scheduler = self.kernel.scheduler
+    def execute(self, irq):
+        pair = irq.parameters
+        program = pair[0]
+        priority = pair[1]
 
-        baseDir = self._kernel.load_program(irq.parameters)
+        pcbTable = self.kernel.pcbTable
+
+        baseDir = self._kernel.loader.load_program(program)
 
         pid = pcbTable.nuevoPid
-        pcb = Pcb(pid, baseDir, 0, irq.parameters.name, priority)
+        pcb = Pcb(pid, baseDir, 0, program.name, priority)
 
         pcbTable.add_pcb(pcb)
+        self.pcbIn(pcb)
 
-        if pcbTable.runningPCB is None:
-            pcb.state = RUNNING_PCB_STATE
-            pcbTable.runningPCB = pcb
-
-            self._kernel.dispatcher.load_pcb(pcb)
-        else:
-            scheduler.addToReadyQueue(pcb)
-
-        log.logger.info("\n Executing program: {name}".format(name=irq.parameters.name))
+        log.logger.info("\n Executing program: {name}".format(name=program.name))
         log.logger.info(HARDWARE)
 
 
 class TimeOutInterruptionHandler(AbstractInterruptionHandler):
 
-    def execute(self, irq, priority):
+    def execute(self, irq):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
         scheduler = self.kernel.scheduler
@@ -259,13 +273,10 @@ class Kernel():
     def ioDeviceController(self):
         return self._ioDeviceController
 
-    def load_program(self, program):
-        return self._loader.load_program(program)
-
     ## emulates a "system call" for programs execution
     def run(self, program, priority):
-        newIRQ = IRQ(NEW_INTERRUPTION_TYPE, program)
-        HARDWARE._interruptVector.handle(newIRQ, priority)
+        newIRQ = IRQ(NEW_INTERRUPTION_TYPE, (program, priority))
+        HARDWARE._interruptVector.handle(newIRQ)
 
     def __repr__(self):
         return "Kernel "
@@ -410,6 +421,8 @@ class AbstractScheduler():
     def getPcb(self):
         log.logger.error("-- getPcb MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
+    def mustExpropiate(pcbInCPU, pcbToAdd):
+        return False
 
 class RoundRobinScheduler(AbstractScheduler):
 
@@ -429,6 +442,7 @@ class RoundRobinScheduler(AbstractScheduler):
     def getPcb(self):
         return self._readyQueue.pop(0)
 
+
 class FCFSScheduler(AbstractScheduler):
 
     def setUpTimer(self):
@@ -446,56 +460,43 @@ class FCFSScheduler(AbstractScheduler):
 
 class PriorityScheduler(AbstractScheduler):
 
-    def __init__(self, kernel):
-        self._kernel = kernel
-        super(PriorityScheduler, self).__init__()
-
-    def kernel(self):
-        return self._kernel
-
     def setUpTimer(self):
         pass
 
     def addToReadyQueue(self, pcb):
-        pcbTable = self._kernel.pcbTable
-        pcbInCPU = pcbTable.runningPCB
-        dispatcher = self._kernel.dispatcher
-
-        if hasHigherPriority(pcb, pcbInCPU) and mustExpropiate(pcbInCPU, pcb):
-            pcbTable.runningPCB = None
-            pcbInCPU.state = READY_PCB_STATE
-            dispatcher.save(pcbInCPU)
-            self._readyQueue.append(pcbInCPU)
-            dispatcher.load(pcb)
-            pcb.state = RUNNING_PCB_STATE
-            pcbTable.runningPCB = pcb
-        else:
+        if len(self._readyQueue) == 0:
             self._readyQueue.append(pcb)
+        else:
+            if len(self._readyQueue) == 1:
+                if h5asHigherPriority(self._readyQueue[0], pcb):
+                    self._readyQueue.append(pcb)
+                else:
+                    self._readyQueue.insert(0, pcb)
+            else:
+                pcbsHigherPriority = []
+                while (len(self._readyQueue) > 0) and (hasHigherPriority(self._readyQueue[0], pcb)):
+                    pcbsHigherPriority.append(self._readyQueue.pop(0))
+                (pcbsHigherPriority.append(pcb)).extend(self._readyQueue)
 
-    def hasHigherPriority(pcb1, pcb2):
+
+    def hasHigherPriority(self, pcb1, pcb2):
         return pcb1.priority < pcb2.priority
 
-    #def readyQueueIsEmpty(self):      COMO SE HACEEE
 
+    def readyQueueIsEmpty(self):
+        return not self._readyQueue
 
     def getPcb(self):
-        pcbHigherPriority = self._readyQueue.pop(0)
-        for pcb in self._readyQueue:
-            if hasHigherPriority(pcb, pcbHigherPriority):
-                    pcbHigherPriority = pcb
-        return pcbHigherPriority
+        return self._readyQueue.pop(0)
 
-    def mustExpropiate(pcbInCPU, pcbToAdd):
-        log.logger.error(
-            "-- mustExpropiate MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
 
 class PriorityPreemtiveScheduler(PriorityScheduler):
 
-    def mustExpropiate(pcbInCPU, pcbToAdd):
-        return True
+    def mustExpropiate(self, pcbToAdd, pcbInCPU):
+        return self.hasHigherPriority(pcbToAdd, pcbInCPU)
 
 class PriorityNoPreemtiveScheduler(PriorityScheduler):
 
-    def mustExpropiate(pcbInCPU, pcbToAdd):
+    def mustExpropiate(self, pcbToAdd, pcbInCPU):
         return False
