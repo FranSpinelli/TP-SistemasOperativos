@@ -421,7 +421,7 @@ class AbstractScheduler():
     def getPcb(self):
         log.logger.error("-- getPcb MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
-    def mustExpropiate(pcbInCPU, pcbToAdd):
+    def mustExpropiate(self, pcbInCPU, pcbToAdd):
         return False
 
 class RoundRobinScheduler(AbstractScheduler):
@@ -468,13 +468,13 @@ class PriorityScheduler(AbstractScheduler):
             self._readyQueue.append(pcb)
         else:
             if len(self._readyQueue) == 1:
-                if h5asHigherPriority(self._readyQueue[0], pcb):
+                if self.hasHigherPriority(self._readyQueue[0], pcb):
                     self._readyQueue.append(pcb)
                 else:
                     self._readyQueue.insert(0, pcb)
             else:
                 pcbsHigherPriority = []
-                while (len(self._readyQueue) > 0) and (hasHigherPriority(self._readyQueue[0], pcb)):
+                while (len(self._readyQueue) > 0) and (self.hasHigherPriority(self._readyQueue[0], pcb)):
                     pcbsHigherPriority.append(self._readyQueue.pop(0))
                 (pcbsHigherPriority.append(pcb)).extend(self._readyQueue)
 
@@ -498,5 +498,5 @@ class PriorityPreemtiveScheduler(PriorityScheduler):
 
 class PriorityNoPreemtiveScheduler(PriorityScheduler):
 
-    def mustExpropiate(self, pcbToAdd, pcbInCPU):
-        return False
+    def print(self):
+        pass
