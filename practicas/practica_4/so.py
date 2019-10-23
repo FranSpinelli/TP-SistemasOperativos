@@ -454,32 +454,40 @@ class GantGraficator():
         self._headers = ["procesos"]
 
     def tick(self, ticknmbr):
+        todosEnDead = True
         if ticknmbr == 1:
             self._representacionDeEjecucion = self.armarCuadro(self._kernel.pcbTable.pcbTable)
-            self.actualizarRepresentacion(ticknmbr,self._kernel.pcbTable.pcbTable)
+            todosEnDead = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
 
         if ticknmbr > 1:
-            self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
+            todosEnDead  = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
 
-        log.logger.info(self.__repr__())
+        if todosEnDead:
+            log.logger.info(self.__repr__())
+            HARDWARE.switchOff()
 
     def actualizarRepresentacion(self,ticknmbr, pcbTable):
         self._headers.append(ticknmbr)
 
+        todosEnDead = True
         nroDeProceso = 0
         for pcb in pcbTable:
-            valorARetornar = "Dead"
+            valorARetornar = "D"
 
             if pcb.state == RUNNING_PCB_STATE:
-                valorARetornar = "Running"
+                valorARetornar = "*"
+                todosEnDead = False
             if pcb.state == READY_PCB_STATE:
-                valorARetornar = "Ready"
+                valorARetornar = "R"
+                todosEnDead = False
             if pcb.state == WAITING_PCB_STATE:
                 valorARetornar = "W"
+                todosEnDead = False
 
             self._representacionDeEjecucion[nroDeProceso].append(valorARetornar)
-
             nroDeProceso = nroDeProceso + 1
+
+        return todosEnDead
 
     def armarCuadro(self,pcbTable):
         listaAEntregar = []

@@ -16,8 +16,8 @@ if __name__ == '__main__':
     HARDWARE.switchOn()
 
     ##creamos el scheduler con el que vamos a trabajar
-    # scheduler = RoundRobinScheduler(2) ##en el constructor del RoundRobinScheduler se le indica el Quantum con el que se va a trabajar
-    scheduler = FCFSScheduler()
+    scheduler = RoundRobinScheduler(2) ##en el constructor del RoundRobinScheduler se le indica el Quantum con el que se va a trabajar
+    #scheduler = FCFSScheduler()
 
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo con el scheduler a utilizar
@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     # creamos el graficador de gant con el kernel con el que va a trabajar y lo suscribimos al clock
     graficadorDeGant = GantGraficator(kernel)
-    HARDWARE.clock.addSubscriber(graficadorDeGant)
+    HARDWARE.clock.addFirstSubscriber(graficadorDeGant)
 
     prg1 = Program("prg1.exe", [ASM.CPU(2), ASM.IO(), ASM.CPU(3), ASM.IO(), ASM.CPU(2)])
     prg2 = Program("prg2.exe", [ASM.CPU(4), ASM.IO(), ASM.CPU(1)])

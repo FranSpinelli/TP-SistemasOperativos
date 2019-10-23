@@ -82,6 +82,9 @@ class Clock():
         self._subscribers = []
         self._running = False
 
+    def addFirstSubscriber(self, subscriber):
+        self._subscribers.insert(0, subscriber)
+
     def addSubscriber(self, subscriber):
         self._subscribers.append(subscriber)
 
