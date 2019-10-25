@@ -106,7 +106,6 @@ class AbstractInterruptionHandler():
 
         else:
             if scheduler.mustExpropiate(pcb, pcbTable.runningPCB):
-                log.logger.info("Expropio: sale {} - entra {}".format(pcbTable.runningPCB, pcb))
                 pcbRunning = pcbTable.runningPCB
                 pcbTable.runningPCB = None
                 dispatcher.save_pcb(pcbRunning)
@@ -381,7 +380,6 @@ class Dispatcher():
         self._mmu = unMMu
 
     def load_pcb(self, pcb):
-        log.logger.info("Loading: {}".format(pcb))
         self._cpu.pc = pcb.pc
         self._mmu.baseDir = pcb.baseDir
         HARDWARE.timer.reset()
@@ -484,7 +482,6 @@ class PriorityNoPreemtiveScheduler(AbstractScheduler):
                 while (len(self._readyQueue) > 0) and (self.hasHigherPriority(self._readyQueue[0], pcb)):
                     pcbsHigherPriority.append(self._readyQueue.pop(0))
                 (pcbsHigherPriority.append(pcb)).extend(self._readyQueue)
-        log.logger.info("ReadyQueue: {}".format(self._readyQueue))
 
     def hasHigherPriority(self, pcb1, pcb2):
         return pcb1.priority < pcb2.priority
