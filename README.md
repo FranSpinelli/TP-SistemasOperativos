@@ -36,3 +36,13 @@ Algunos detalles:
  - `len(self._queue) == 0` de la linea 367 es igual a `self._queue` como resultado booleano 
  
 Por lo demas esta todo ok
+
+
+### Práctica 4:
+    - Entregada. Faltan Schedulers con prioridad expropiativo y no expropiativo 
+
+Notas:
+
+  - No estan los schedulers con prioridad
+  - No se utiliza mustExpropiate() (que es necesario para que schedulers con prioridad funcionen correctamente, pero se utiliza en los InterruptionHandlers por igual)
+  - No se hicieron las factorizaciones sugeridas en la practica 3
