@@ -142,7 +142,7 @@ class KillInterruptionHandler(AbstractInterruptionHandler):
         dispatcher.save_pcb(pcb)
         pcb.state = TERMINATED_PCB_STATE
 
-        pcbTable.remove_pcb(pcb.pid)
+        #pcbTable.remove_pcb(pcb.pid)
         pcbTable.runningPCB = None
 
         self.pcbOut()
@@ -348,6 +348,10 @@ class PcbTable():
         self._pidActual = self._pidActual + 1
         return valorARetornar
 
+    @property
+    def pcbTable(self):
+        return self._pcbTable
+
     def get_pcb(self, pid):
         return self._pcbTable[pid]
 
@@ -400,7 +404,7 @@ class Loader():
         for index in range(0, progSize):
             inst = program.instructions[index]
             HARDWARE.memory.write(primeraDireccioLibre, inst)
-            primeraDireccioLibre = primeraDireccioLibre + 1  ##WTF pasa si hago primeraDirLibre=+1???
+            primeraDireccioLibre = primeraDireccioLibre + 1
         self._baseDir = primeraDireccioLibre
         return baseDirdelPrograma
 
@@ -497,4 +501,58 @@ class PriorityPreemtiveScheduler(PriorityNoPreemtiveScheduler):
     def mustExpropiate(self, pcbToAdd, pcbInCPU):
         return self.hasHigherPriority(pcbToAdd, pcbInCPU)
 
+# -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 
+class GantGraficator():
+
+    def __init__(self, kernel):
+        self._kernel = kernel
+        self._representacionDeEjecucion = []
+        self._headers = ["procesos"]
+
+    def tick(self, ticknmbr):
+        todosEnDead = True
+        if ticknmbr == 1:
+            self._representacionDeEjecucion = self.armarCuadro(self._kernel.pcbTable.pcbTable)
+            todosEnDead = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
+
+        if ticknmbr > 1:
+            todosEnDead  = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
+
+        if todosEnDead:
+            log.logger.info(self.__repr__())
+            HARDWARE.switchOff()
+
+    def actualizarRepresentacion(self,ticknmbr, pcbTable):
+        self._headers.append(ticknmbr)
+
+        todosEnDead = True
+        nroDeProceso = 0
+        for pcb in pcbTable:
+            valorARetornar = "D"
+
+            if pcb.state == RUNNING_PCB_STATE:
+                valorARetornar = "*"
+                todosEnDead = False
+            if pcb.state == READY_PCB_STATE:
+                valorARetornar = "R"
+                todosEnDead = False
+            if pcb.state == WAITING_PCB_STATE:
+                valorARetornar = "W"
+                todosEnDead = False
+
+            self._representacionDeEjecucion[nroDeProceso].append(valorARetornar)
+            nroDeProceso = nroDeProceso + 1
+
+        return todosEnDead
+
+    def armarCuadro(self,pcbTable):
+        listaAEntregar = []
+        for pcb in pcbTable:
+            listaAEntregar.append([pcb.path])
+        return listaAEntregar
+
+
+
+    def __repr__(self):
+        return tabulate(self._representacionDeEjecucion, headers=self._headers, tablefmt='grid', stralign='center')

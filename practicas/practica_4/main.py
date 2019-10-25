@@ -2,7 +2,6 @@ from hardware import *
 from so import *
 import log
 
-
 ##
 ##  MAIN
 ##
@@ -25,17 +24,19 @@ if __name__ == '__main__':
     # "booteamos" el sistema operativo con el scheduler a utilizar
     kernel = Kernel(scheduler)
 
-    # Ahora vamos a intentar ejecutar 3 programas a la vez
-    ##################
-    prg1 = Program("prg1.exe", [ASM.CPU(2), ASM.IO(), ASM.CPU(3), ASM.IO(), ASM.CPU(2)])
-    prg2 = Program("prg2.exe", [ASM.CPU(7)])
-    prg3 = Program("prg3.exe", [ASM.CPU(4), ASM.IO(), ASM.CPU(1)])
+    # creamos el graficador de gant con el kernel con el que va a trabajar y lo suscribimos al clock
+    graficadorDeGant = GantGraficator(kernel)
+    HARDWARE.clock.addFirstSubscriber(graficadorDeGant)
 
-    #prg1 = Program("prg1.exe", [ASM.CPU(2)])
-    #prg2 = Program("prg2.exe", [ASM.CPU(4)])
-    #prg3 = Program("prg3.exe", [ASM.CPU(3)])
+    prg1 = Program("prg1.exe", [ASM.CPU(2), ASM.IO(), ASM.CPU(3), ASM.IO(), ASM.CPU(2)])
+    prg2 = Program("prg2.exe", [ASM.CPU(4), ASM.IO(), ASM.CPU(1)])
+    prg3 = Program("prg3.exe", [ASM.CPU(3)])
+    # ---------------------------------------------------------------------------------------------------
+    # prg1 = Program("prg1.exe", [ASM.CPU(2)])
+    # prg2 = Program("prg2.exe", [ASM.CPU(4)])
+    # prg3 = Program("prg3.exe", [ASM.CPU(3)])
 
     # execute all programs "concurrently"
-    kernel.run(prg1, 3)
+    kernel.run(prg1, 1)
     kernel.run(prg2, 2)
-    kernel.run(prg3, 1)
+    kernel.run(prg3, 3)
