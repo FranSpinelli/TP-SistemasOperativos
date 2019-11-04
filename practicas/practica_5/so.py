@@ -98,7 +98,7 @@ class AbstractInterruptionHandler():
         dispatcher = self.kernel.dispatcher
         scheduler = self.kernel.scheduler
 
-        if pcbTable.runningPCB is None:
+        if not pcbTable.runningPCB:
             pcb.state = RUNNING_PCB_STATE
             pcbTable.runningPCB = pcb
 
@@ -131,18 +131,21 @@ class AbstractInterruptionHandler():
             pcbTable.runningPCB = pcbAEjecutar
 
 
-class KillInterruptionHandler(AbstractInterruptionHandler):
-
-    def execute(self, irq):
+    def quitPCBFromRunningAndChangeStateTo(self, state):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
 
         pcb = pcbTable.runningPCB
-        dispatcher.save_pcb(pcb)
-        pcb.state = TERMINATED_PCB_STATE
-
-        #pcbTable.remove_pcb(pcb.pid)
         pcbTable.runningPCB = None
+        dispatcher.save_pcb(pcb)
+
+        pcb.state = state
+
+class KillInterruptionHandler(AbstractInterruptionHandler):
+
+    def execute(self, irq):
+
+        self.quitPCBFromRunningAndChangeStateTo(TERMINATED_PCB_STATE)
 
         self.pcbOut()
 
@@ -150,14 +153,10 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
         pcbTable = self.kernel.pcbTable
-        dispatcher = self.kernel.dispatcher
-
         operation = irq.parameters
-
         pcb = pcbTable.runningPCB
-        pcbTable.runningPCB = None
-        dispatcher.save_pcb(pcb)
-        pcb.state = WAITING_PCB_STATE
+
+        self.quitPCBFromRunningAndChangeStateTo(WAITING_PCB_STATE)
 
         self.kernel.ioDeviceController.runOperation(pcb, operation)
         log.logger.info(self.kernel.ioDeviceController)
@@ -170,7 +169,6 @@ class IoOutInterruptionHandler(AbstractInterruptionHandler):
     def execute(self, irq):
 
         pcb = self.kernel.ioDeviceController.getFinishedPCB()
-
         self.pcbIn(pcb)
 
 
