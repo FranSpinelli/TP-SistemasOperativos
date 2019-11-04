@@ -251,6 +251,7 @@ class Kernel():
         self._scheduler = schedulerToUse
         self.scheduler.setUpTimer()  # set up the timer of the system with the quantum that the scheduler has
 
+
     @property
     def scheduler(self):
         return self._scheduler
@@ -495,6 +496,35 @@ class PriorityPreemtiveScheduler(PriorityNoPreemtiveScheduler):
 
     def mustExpropiate(self, pcbToAdd, pcbInCPU):
         return self.hasHigherPriority(pcbToAdd, pcbInCPU)
+
+class MemoryManager:
+
+    def __init__(self, frameSize):
+        self._frameSize = HARDWARE.mmu.frameSize
+        self._freeFrames = list(range(HARDWARE.memory.size // HARDWARE.mmu.frameSize))
+
+    @property
+    def freeFrames(self):
+        return self._freeFrames
+
+    def NumberOfFreeMemCells(self):
+        return len(self._freeFrames) * self._frameSize
+
+    def allocFrames(self, cantOfFramesRequired):
+
+        if cantOfFramesRequired > len(self.freeFrames):
+            raise Exception("\n*\n* ERROR \n*\n  Out of memory Exception \nCantidad de frames disponibles: {freeFrames}"
+                            "\nCantidad de frames solicitados: {framesRequired}"
+                            .format(freeFrames = len(self._freeFrames), framesRequired = cantOfFramesRequired))
+        else:
+            listWithFreeFrames = self._freeFrames[:cantOfFramesRequired]
+            self._freeFrames = self._freeFrames[cantOfFramesRequired:]
+
+        return listWithFreeFrames
+
+    def freeFrames(self, releasedFrames):
+
+        self._freeFrames.extend(releasedFrames)
 
 # -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 

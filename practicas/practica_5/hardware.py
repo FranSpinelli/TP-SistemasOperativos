@@ -323,13 +323,14 @@ class Timer:
 class Hardware():
 
     ## Setup our hardware
-    def setup(self, memorySize):
+    def setup(self, memorySize, frameSize):
         ## add the components to the "motherboard"
         self._memory = Memory(memorySize)
         self._interruptVector = InterruptVector()
         self._clock = Clock()
         self._ioDevice = PrinterIODevice()
         self._mmu = MMU(self._memory)
+        self.mmu.frameSize = frameSize
         self._cpu = Cpu(self._mmu, self._interruptVector)
         self._timer = Timer(self._cpu, self._interruptVector)
         self._clock.addSubscriber(self._ioDevice)
