@@ -130,7 +130,6 @@ class AbstractInterruptionHandler():
             dispatcher.load_pcb(pcbAEjecutar)
             pcbTable.runningPCB = pcbAEjecutar
 
-
     def quitPCBFromRunningAndChangeStateTo(self, state):
         pcbTable = self.kernel.pcbTable
         dispatcher = self.kernel.dispatcher
@@ -141,13 +140,14 @@ class AbstractInterruptionHandler():
 
         pcb.state = state
 
+
 class KillInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
-
         self.quitPCBFromRunningAndChangeStateTo(TERMINATED_PCB_STATE)
 
         self.pcbOut()
+
 
 class IoInInterruptionHandler(AbstractInterruptionHandler):
 
@@ -167,7 +167,6 @@ class IoInInterruptionHandler(AbstractInterruptionHandler):
 class IoOutInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
-
         pcb = self.kernel.ioDeviceController.getFinishedPCB()
         self.pcbIn(pcb)
 
@@ -251,7 +250,6 @@ class Kernel():
         self._scheduler = schedulerToUse
         self.scheduler.setUpTimer()  # set up the timer of the system with the quantum that the scheduler has
 
-
     @property
     def scheduler(self):
         return self._scheduler
@@ -332,6 +330,7 @@ class Pcb():
 
     def __repr__(self):
         return "Pid: {} - Name: {} - PC: {} - priority: {}".format(self.pid, self.path, self.pc, self.priority)
+
 
 class PcbTable():
 
@@ -429,6 +428,7 @@ class AbstractScheduler():
     def mustExpropiate(self, pcbInCPU, pcbToAdd):
         return False
 
+
 class RoundRobinScheduler(AbstractScheduler):
 
     def __init__(self, quantum):
@@ -462,6 +462,7 @@ class FCFSScheduler(AbstractScheduler):
     def getPcb(self):
         return self._readyQueue.pop(0)
 
+
 class PriorityNoPreemtiveScheduler(AbstractScheduler):
 
     def setUpTimer(self):
@@ -485,17 +486,18 @@ class PriorityNoPreemtiveScheduler(AbstractScheduler):
     def hasHigherPriority(self, pcb1, pcb2):
         return pcb1.priority < pcb2.priority
 
-
     def readyQueueIsEmpty(self):
         return not self._readyQueue
 
     def getPcb(self):
         return self._readyQueue.pop(0)
 
+
 class PriorityPreemtiveScheduler(PriorityNoPreemtiveScheduler):
 
     def mustExpropiate(self, pcbToAdd, pcbInCPU):
         return self.hasHigherPriority(pcbToAdd, pcbInCPU)
+
 
 class MemoryManager:
 
@@ -515,7 +517,7 @@ class MemoryManager:
         if cantOfFramesRequired > len(self.freeFrames):
             raise Exception("\n*\n* ERROR \n*\n  Out of memory Exception \nCantidad de frames disponibles: {freeFrames}"
                             "\nCantidad de frames solicitados: {framesRequired}"
-                            .format(freeFrames = len(self._freeFrames), framesRequired = cantOfFramesRequired))
+                            .format(freeFrames=len(self._freeFrames), framesRequired=cantOfFramesRequired))
         else:
             listWithFreeFrames = self._freeFrames[:cantOfFramesRequired]
             self._freeFrames = self._freeFrames[cantOfFramesRequired:]
@@ -525,6 +527,22 @@ class MemoryManager:
     def freeFrames(self, releasedFrames):
 
         self._freeFrames.extend(releasedFrames)
+
+
+class FileSystem:
+
+    def __init__(self):
+        self._fileSystem = dict()
+
+    def write(self, path, program):
+        self._fileSystem[path] = program
+
+    def read(self, path):
+
+        if path in self._fileSystem:
+            return self._fileSystem[path]
+        else:
+            return  log.logger.error("-- the path does not exist.")
 
 # -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 
@@ -542,13 +560,13 @@ class GantGraficator():
             todosEnDead = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
 
         if ticknmbr > 1:
-            todosEnDead  = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
+            todosEnDead = self.actualizarRepresentacion(ticknmbr, self._kernel.pcbTable.pcbTable)
 
         if todosEnDead:
             log.logger.info(self.__repr__())
             HARDWARE.switchOff()
 
-    def actualizarRepresentacion(self,ticknmbr, pcbTable):
+    def actualizarRepresentacion(self, ticknmbr, pcbTable):
         self._headers.append(ticknmbr)
 
         todosEnDead = True
@@ -571,13 +589,11 @@ class GantGraficator():
 
         return todosEnDead
 
-    def armarCuadro(self,pcbTable):
+    def armarCuadro(self, pcbTable):
         listaAEntregar = []
         for pcb in pcbTable:
             listaAEntregar.append([pcb.path])
         return listaAEntregar
-
-
 
     def __repr__(self):
         return tabulate(self._representacionDeEjecucion, headers=self._headers, tablefmt='grid', stralign='center')
