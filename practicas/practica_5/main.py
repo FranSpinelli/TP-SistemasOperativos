@@ -16,10 +16,10 @@ if __name__ == '__main__':
     HARDWARE.switchOn()
 
     ##creamos el scheduler con el que vamos a trabajar
-    scheduler = RoundRobinScheduler(3)
+    #scheduler = RoundRobinScheduler(3)
     #scheduler = FCFSScheduler()
     #scheduler = PriorityPreemtiveScheduler()
-    #scheduler = PriorityNoPreemtiveScheduler()
+    scheduler = PriorityNoPreemtiveScheduler()
 
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo con el scheduler a utilizar
@@ -37,7 +37,12 @@ if __name__ == '__main__':
     prg2 = Program("prg2.exe", [ASM.CPU(4)])
     prg3 = Program("prg3.exe", [ASM.CPU(3)])
 
-    # execute all programs "concurrently"
-    kernel.run(prg1, 1)
-    kernel.run(prg2, 2)
-    kernel.run(prg3, 3)
+    #write programs in the fileSystem
+    kernel.fileSystem.write("C:/prg1.exe", prg1)
+    kernel.fileSystem.write("C:/prg2.exe", prg2)
+    kernel.fileSystem.write("C:/prg3.exe", prg3)
+
+    #execute from a path
+    kernel.run("C:/prg1.exe", 1)
+    kernel.run("C:/prg2.exe", 2)
+    kernel.run("C:/prg3.exe", 3)

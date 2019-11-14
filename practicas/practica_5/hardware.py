@@ -186,7 +186,9 @@ class MMU():
         ##calculamos la direccion fisica resultante
         frameBaseDir  = self._frameSize * frameId
         physicalAddress = frameBaseDir + offset
-        #
+
+        log.logger.info("PhysicalAddres={physicalAddr}".format(physicalAddr=physicalAddress))
+
         # obtenemos la instrucción alocada en esa direccion
         return self._memory.read(physicalAddress)
 
