@@ -221,6 +221,20 @@ class PageFaultInterruptionHandler(AbstractInterruptionHandler):
 
         self.kernel.loader.loadPageOfPCB(pageIDToPutInMemory, pcb)
 
+class CpuWriteInterruptionHandler(AbstractInterruptionHandler):
+
+    def execute(self, irq):
+        pcbID = self.kernel.pcbTable.runningPCB.pid
+        logicalAddress = irq.parameters
+        pageID = logicalAddress // HARDWARE.mmu.frameSize
+
+        pcbPageTable = self.kernel.memoryManager.getPageTable(pcbID)
+        pageIDTuple = pcbPageTable[pageID]
+
+        self.kernel.memoryManager.completePageTableOfWith(pcbID, pageID, pageIDTuple[0], True)
+
+
+
 # emulates the core of an Operative System
 class Kernel():
 
@@ -243,6 +257,9 @@ class Kernel():
 
         pageFaultHandler = PageFaultInterruptionHandler(self)
         HARDWARE.interruptVector.register(PAGE_FAULT_INTERRUPTION_TYPE, pageFaultHandler)
+
+        cpuWriteHandler = CpuWriteInterruptionHandler(self)
+        HARDWARE.interruptVector.register(CPU_WRITE_INTERRUPTION_TYPE, cpuWriteHandler)
 
         ## controls the Hardware's I/O Device
         self._ioDeviceController = IoDeviceController(HARDWARE.ioDevice)
@@ -440,7 +457,7 @@ class Loader():
 
             HARDWARE.memory.write(physicalAddress, instructionsOfPageWithID[instructionNumber])
 
-        self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameOfPage)
+        self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameOfPage, False)
 
     def loadNewPageTableOf(self, pcb):
         self._kernel.memoryManager.putPageTable(pcb.pid,  dict())
@@ -571,9 +588,9 @@ class VictimSelectionAlgorithmAbstract:
             raise Exception("\n*\n* ERROR \n*\n Error en el Memory Manager \nNo se cargo el proceso  {pid}".format(
                 pid=str(pid)))
 
-    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage):
+    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage, aBoolean):
         pageTable = self._pageTable[pid]
-        pageTable[pageIDToPutInMemory] = frameOfPage
+        pageTable[pageIDToPutInMemory] = (frameOfPage, aBoolean)# the second value indicates if in the frame was a CPU_WRITE instruction
 
     def selectVictimUsing(self):
         log.logger.error(
@@ -585,8 +602,8 @@ class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
         super(FifoAlgorithm, self).__init__()
         self._victimQueue = []
 
-    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameIDOfPage):
-        super(FifoAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage)
+    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameIDOfPage, aBoolean):
+        super(FifoAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage, aBoolean)
         self._victimQueue.append(frameIDOfPage)
 
     def selectVictimUsing(self):
@@ -616,11 +633,11 @@ class MemoryManager:
         #        pid=str(pid)))
         return self._VSA.getPageTable(pid)
 
-    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage):
+    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage, aBoolean):
 
         #pageTable = self._pageTable[pid]
         #pageTable[pageIDToPutInMemory] = frameOfPage
-        self._VSA.completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage)
+        self._VSA.completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage, aBoolean)
 
     def NumberOfFreeMemCells(self):
         return len(self._freeFrames) * HARDWARE.mmu.frameSize

@@ -37,9 +37,13 @@ if __name__ == '__main__':
     #prg2 = Program("prg2.exe", [ASM.CPU(4), ASM.IO(), ASM.CPU(1)])
     #prg3 = Program("prg3.exe", [ASM.CPU(3)])
 
-    prg1 = Program("prg1.exe", [ASM.CPU_READ(10)])
-    prg2 = Program("prg2.exe", [ASM.CPU_READ(10)])
-    prg3 = Program("prg3.exe", [ASM.CPU_READ(10)])
+    #prg1 = Program("prg1.exe", [ASM.CPU_READ(10)])
+    #prg2 = Program("prg2.exe", [ASM.CPU_READ(10)])
+    #prg3 = Program("prg3.exe", [ASM.CPU_READ(10)])
+
+    prg1 = Program("prg1.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
+    prg2 = Program("prg2.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
+    prg3 = Program("prg3.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
 
     #write programs in the fileSystem
     kernel.fileSystem.write("C:/prg1.exe", prg1)

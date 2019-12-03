@@ -51,6 +51,7 @@ IO_OUT_INTERRUPTION_TYPE = "#IO_OUT"
 NEW_INTERRUPTION_TYPE = "#NEW"
 TIMEOUT_INTERRUPTION_TYPE = "#TIMEOUT"
 PAGE_FAULT_INTERRUPTION_TYPE = "#PAGE_FAULT"
+CPU_WRITE_INTERRUPTION_TYPE = "#CPU_WRITE"
 
 
 ## emulates an Interrupt request
@@ -202,13 +203,13 @@ class MMU():
         #
         # buscamos la direccion Base del frame donde esta almacenada la pagina
         try:
-            frameId = self._tlb[pageId]
+            frameId = self._tlb[pageId][0]
         except:
             pageFaultIRQ = IRQ(PAGE_FAULT_INTERRUPTION_TYPE, pageId)
             HARDWARE.interruptVector.handle(pageFaultIRQ)
             # una vez resuelto el pageFault, volvemos a buscar en la Page Table
             # ya que la pagina, ahora debe estar cargada si o si
-            frameId = self._tlb[pageId]
+            frameId = self._tlb[pageId][0]
 
         ### setear los flags manejados por el MMU para los algoritmos de seleccion de victima
 
@@ -264,6 +265,9 @@ class Cpu():
         elif ASM.isIO(self._ir):
             ioInIRQ = IRQ(IO_IN_INTERRUPTION_TYPE, self._ir)
             self._interruptVector.handle(ioInIRQ)
+        elif ASM.isCPU_WRITE(self._ir):
+            cpuWriteIRQ = IRQ(CPU_WRITE_INTERRUPTION_TYPE,self._pc)
+            self._interruptVector.handle(cpuWriteIRQ)
         else:
             log.logger.info("cpu - Exec: {instr}, PC={pc}".format(instr=self._ir, pc=self._pc))
 
