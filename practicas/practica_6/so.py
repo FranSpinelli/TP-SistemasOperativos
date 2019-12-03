@@ -592,9 +592,9 @@ class VictimSelectionAlgorithmAbstract:
         pageTable = self._pageTable[pid]
         pageTable[pageIDToPutInMemory] = (frameOfPage, aBoolean)# the second value indicates if in the frame was a CPU_WRITE instruction
 
-    def selectVictimUsing(self):
+    def selectVictim(self):
         log.logger.error(
-            "-- selectVictimUsing MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
+            "-- selectVictim MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
 
 class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
 
@@ -606,8 +606,59 @@ class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
         super(FifoAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage, aBoolean)
         self._victimQueue.append(frameIDOfPage)
 
-    def selectVictimUsing(self):
+    def selectVictim(self):
         return self._victimQueue.pop(0)
+
+class LRUAlgorithm(VictimSelectionAlgorithmAbstract):
+
+    def __init__(self):
+        super(LRUAlgorithm, self).__init__()
+        self._aguja = None
+
+    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage, aBoolean):
+        super(LRUAlgorithm,self).completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage, aBoolean)
+
+        if self._aguja is None:
+            self._aguja = (pid, pageIDToPutInMemory)
+
+    def selectVictim(self):
+        victim = None
+        while victim is None:
+            pcbPageTable = self._pageTable[self._aguja[0]]
+            tupleWithAguja = pcbPageTable[self._aguja[1]]
+
+            log.logger.info("process id de aguja={physicalAddr}".format(physicalAddr=self._aguja[0]))
+            log.logger.info("pagina de la aguja ={physicalAddr}".format(physicalAddr=self._aguja[1]))
+            log.logger.info("tupla=({p1}, {p2})".format(p1=tupleWithAguja[0], p2=tupleWithAguja[1]))
+
+            if tupleWithAguja[1]:
+                self.completePageTableOfWith(self._aguja[0], self._aguja[1], tupleWithAguja[0], False)
+            else:
+                victim = tupleWithAguja[0]
+            self._aguja = self._calculateNextAgujaPosition()
+        return victim
+
+    def _calculateNextAgujaPosition(self):
+        pID = self._aguja[0]
+        pageID = self._aguja[1]
+
+        pIDList = list(self._pageTable.keys())
+        pagesIDList = list(self._pageTable[pID].keys())
+
+        if len(pagesIDList) == pagesIDList.index(pageID) + 1:
+            nuevoPageID = pagesIDList[0]
+            #-----------------------------------------
+            if len(pIDList) == pIDList.index(pID) + 1:
+                nuevoPID = pIDList[0]
+            else:
+                nuevoPID = pIDList.index(pID) + 1
+            #-------------------------------------------
+        else:
+            nuevoPageID = pagesIDList[pagesIDList.index(pageID)+1]
+            nuevoPID = pID
+
+        log.logger.info("nueva aguja=({p1}, {p2})".format(p1=nuevoPID, p2=nuevoPageID))
+        return (nuevoPID, nuevoPageID)
 
 class MemoryManager:
 
@@ -626,17 +677,10 @@ class MemoryManager:
 
     def getPageTable(self, pid):
 
-        #if pid in self._pageTable:
-        #    return self._pageTable[pid]
-        #else:
-        #    raise Exception("\n*\n* ERROR \n*\n Error en el Memory Manager \nNo se cargo el proceso  {pid}".format(
-        #        pid=str(pid)))
         return self._VSA.getPageTable(pid)
 
     def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage, aBoolean):
 
-        #pageTable = self._pageTable[pid]
-        #pageTable[pageIDToPutInMemory] = frameOfPage
         self._VSA.completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage, aBoolean)
 
     def NumberOfFreeMemCells(self):
@@ -645,22 +689,14 @@ class MemoryManager:
     def allocFrames(self, cantOfFramesRequired):
 
         if cantOfFramesRequired > len(self.freeFrames):
-            #raise Exception("\n*\n* ERROR \n*\n  Out of memory Exception \nCantidad de frames disponibles: {freeFrames}"
-            #                "\nCantidad de frames solicitados: {framesRequired}"
-            #                .format(freeFrames=len(self._freeFrames), framesRequired=cantOfFramesRequired))
 
-            victimFrameToSWAP = self._VSA.selectVictimUsing()
+            victimFrameToSWAP = self._VSA.selectVictim()
             instructionsOfTheFrame = HARDWARE.mmu.getInstructionsOfFrame(victimFrameToSWAP)
             self._kernel.fileSystem.swap(victimFrameToSWAP, instructionsOfTheFrame)#pongo la pag en la memoria virtual
             self.freeTheFrames(victimFrameToSWAP)#libero el frame de la pag que fue puesta en memoria virtual(ya puede ser usada)
             return self._getFreeFrames(cantOfFramesRequired)
 
-        # no tirar error, hay que seleccionar victima y hacer el SWAP, deberia tener un OBJ con el
-        # algoritmo que se encargue de la seleccion
         else:
-            #listWithFreeFrames = self._freeFrames[:cantOfFramesRequired]
-            #self._freeFrames = self._freeFrames[cantOfFramesRequired:]
-            #return listWithFreeFrames
 
             return self._getFreeFrames(cantOfFramesRequired)
 

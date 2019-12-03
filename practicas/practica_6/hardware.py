@@ -149,8 +149,6 @@ class Memory():
 
     def __repr__(self):
         return tabulate(enumerate(self._cells), tablefmt='psql')
-        ##return "Memoria = {mem}".format(mem=self._cells)
-
 
 ## emulates the Memory Management Unit (MMU)
 class MMU():
@@ -188,9 +186,6 @@ class MMU():
     def resetTLB(self):
         self._tlb = dict()
 
-    # def setPageFrame(self, pageId, frameId):
-    #    self._tlb[pageId] = frameId
-
     def fetch(self, logicalAddress):
         if (logicalAddress > self._limit):
             raise Exception(
@@ -213,7 +208,6 @@ class MMU():
 
         ### setear los flags manejados por el MMU para los algoritmos de seleccion de victima
 
-        #
         ##calculamos la direccion fisica resultante
         frameBaseDir = self._frameSize * frameId
         physicalAddress = frameBaseDir + offset
@@ -231,7 +225,6 @@ class MMU():
             instructionsOfTheFrame.append(instr)
 
         return instructionsOfTheFrame
-
 
 ## emulates the main Central Processor Unit
 class Cpu():
@@ -285,7 +278,6 @@ class Cpu():
     def __repr__(self):
         return "CPU(PC={pc})".format(pc=self._pc)
 
-
 ## emulates an Input/output device of the Hardware
 class AbstractIODevice():
 
@@ -329,11 +321,9 @@ class AbstractIODevice():
                                                                                                 ticksCount=self._ticksCount,
                                                                                                 deviceTime=self._deviceTime))
 
-
 class PrinterIODevice(AbstractIODevice):
     def __init__(self):
         super(PrinterIODevice, self).__init__("Printer", 3)
-
 
 class Timer:
 
@@ -365,7 +355,6 @@ class Timer:
     def quantum(self, quantum):
         self._active = True
         self._quantum = quantum
-
 
 ## emulates the Hardware that were the Operative System run
 class Hardware():
@@ -422,7 +411,6 @@ class Hardware():
 
     def __repr__(self):
         return "HARDWARE state {cpu}\n{mem}".format(cpu=self._cpu, mem=self._memory)
-
 
 ### HARDWARE is a global variable
 ### can be access from any

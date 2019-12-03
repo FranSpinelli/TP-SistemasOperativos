@@ -21,11 +21,12 @@ if __name__ == '__main__':
     #scheduler = PriorityPreemtiveScheduler()
     #scheduler = PriorityNoPreemtiveScheduler()
 
-    algorithm = FifoAlgorithm()
-    #algorithm = LRUAlgorithm() #LRU = least recently used
+    #creamos el algorithmo con el que se seleccionara la victima para poder realizar el SWAP
+    #algorithm = FifoAlgorithm()
+    algorithm = LRUAlgorithm() #LRU = least recently used
 
     ## new create the Operative System Kernel
-    # "booteamos" el sistema operativo con el scheduler a utilizar
+    # "booteamos" el sistema operativo con el scheduler y el algoritmo a utilizar
     kernel = Kernel(scheduler, algorithm)
 
     # creamos el graficador de gant con el kernel con el que va a trabajar y lo suscribimos al clock
@@ -33,6 +34,8 @@ if __name__ == '__main__':
     HARDWARE.clock.addFirstSubscriber(graficadorDeGant)
 
     # ---------------------------------------------------------------------------------------------------
+    #MODELOS A EJECUTAR
+
     #prg1 = Program("prg1.exe", [ASM.CPU(2), ASM.IO(), ASM.CPU(3), ASM.IO(), ASM.CPU(2)])
     #prg2 = Program("prg2.exe", [ASM.CPU(4), ASM.IO(), ASM.CPU(1)])
     #prg3 = Program("prg3.exe", [ASM.CPU(3)])
@@ -44,6 +47,7 @@ if __name__ == '__main__':
     prg1 = Program("prg1.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
     prg2 = Program("prg2.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
     prg3 = Program("prg3.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
+    #----------------------------------------------------------------------------------------------------
 
     #write programs in the fileSystem
     kernel.fileSystem.write("C:/prg1.exe", prg1)
