@@ -21,9 +21,12 @@ if __name__ == '__main__':
     #scheduler = PriorityPreemtiveScheduler()
     #scheduler = PriorityNoPreemtiveScheduler()
 
+    algorithm = FifoAlgorithm()
+    #algorithm = LRUAlgorithm() #LRU = least recently used
+
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo con el scheduler a utilizar
-    kernel = Kernel(scheduler)
+    kernel = Kernel(scheduler, algorithm)
 
     # creamos el graficador de gant con el kernel con el que va a trabajar y lo suscribimos al clock
     graficadorDeGant = GantGraficator(kernel)
@@ -34,9 +37,9 @@ if __name__ == '__main__':
     #prg2 = Program("prg2.exe", [ASM.CPU(4), ASM.IO(), ASM.CPU(1)])
     #prg3 = Program("prg3.exe", [ASM.CPU(3)])
 
-    prg1 = Program("prg1.exe", [ASM.CPU(6)])
-    prg2 = Program("prg2.exe", [ASM.CPU(6)])
-    prg3 = Program("prg3.exe", [ASM.CPU(6)])
+    prg1 = Program("prg1.exe", [ASM.CPU_READ(10)])
+    prg2 = Program("prg2.exe", [ASM.CPU_READ(10)])
+    prg3 = Program("prg3.exe", [ASM.CPU_READ(10)])
 
     #write programs in the fileSystem
     kernel.fileSystem.write("C:/prg1.exe", prg1)

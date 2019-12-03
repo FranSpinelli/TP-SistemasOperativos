@@ -224,7 +224,7 @@ class PageFaultInterruptionHandler(AbstractInterruptionHandler):
 # emulates the core of an Operative System
 class Kernel():
 
-    def __init__(self, schedulerToUse):
+    def __init__(self, schedulerToUse, algorithmToUse):
         ## setup interruption handlers
         killHandler = KillInterruptionHandler(self)
         HARDWARE.interruptVector.register(KILL_INTERRUPTION_TYPE, killHandler)
@@ -257,10 +257,10 @@ class Kernel():
         self._pcbTable = PcbTable()
 
         ##Specific component to organize the logic mem
-        self._memoryManager = MemoryManager()
+        self._memoryManager = MemoryManager(self, algorithmToUse)
 
         ##specific component that simulates a fileSystem very simply
-        self._fileSystem = FileSystem()
+        self._fileSystem = FileSystem(self)
 
         ##the scheduler with which the kernel will work
         self._scheduler = schedulerToUse
@@ -445,20 +445,6 @@ class Loader():
     def loadNewPageTableOf(self, pcb):
         self._kernel.memoryManager.putPageTable(pcb.pid,  dict())
 
-    #def __generatePageTable(self, numberOfPages):
-        #pageTable = dict()
-        #for index in range(0, len(framesToUseID)):
-        #    pageTable[index] = framesToUseID[index]
-        #return pageTable
-
-    #def __numberOfPagesOf(self, programSize):
-    #    result = (programSize // HARDWARE.mmu.frameSize)
-    #
-    #    if programSize % HARDWARE.mmu.frameSize > 0:
-    #        result += 1
-
-    #   return result
-
     def __instructionsOfPage(self, pageIDToPutInMemory, pcbProgram):
         instructions = pcbProgram.instructions
         instructionsOfPage = []
@@ -477,7 +463,7 @@ class Loader():
 
         return result
 
-class AbstractScheduler():
+class AbstractScheduler:
 
     def __init__(self):
         self._readyQueue = []
@@ -570,22 +556,15 @@ class PriorityPreemtiveScheduler(PriorityNoPreemtiveScheduler):
     def mustExpropiate(self, pcbToAdd, pcbInCPU):
         return self.hasHigherPriority(pcbToAdd, pcbInCPU)
 
-
-class MemoryManager:
+class VictimSelectionAlgorithmAbstract:
 
     def __init__(self):
-        self._freeFrames = list(range(HARDWARE.memory.size // HARDWARE.mmu.frameSize))
         self._pageTable = dict()
-
-    @property
-    def freeFrames(self):
-        return self._freeFrames
 
     def putPageTable(self, pid, pageTable):
             self._pageTable[pid] = pageTable
 
     def getPageTable(self, pid):
-
         if pid in self._pageTable:
             return self._pageTable[pid]
         else:
@@ -593,9 +572,55 @@ class MemoryManager:
                 pid=str(pid)))
 
     def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage):
-
         pageTable = self._pageTable[pid]
         pageTable[pageIDToPutInMemory] = frameOfPage
+
+    def selectVictimUsing(self):
+        log.logger.error(
+            "-- selectVictimUsing MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
+
+class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
+
+    def __init__(self):
+        super(FifoAlgorithm, self).__init__()
+        self._victimQueue = []
+
+    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameIDOfPage):
+        super(FifoAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage)
+        self._victimQueue.append(frameIDOfPage)
+
+    def selectVictimUsing(self):
+        return self._victimQueue.pop(0)
+
+class MemoryManager:
+
+    def __init__(self, kernel, algorithmToUse):
+        self._kernel = kernel
+        self._VSA = algorithmToUse # VSA = Victim Selection Algorithm
+        self._freeFrames = list(range(HARDWARE.memory.size // HARDWARE.mmu.frameSize))
+
+    @property
+    def freeFrames(self):
+        return self._freeFrames
+
+    def putPageTable(self, pid, pageTable):
+            #self._pageTable[pid] = pageTable
+            self._VSA.putPageTable(pid, pageTable)
+
+    def getPageTable(self, pid):
+
+        #if pid in self._pageTable:
+        #    return self._pageTable[pid]
+        #else:
+        #    raise Exception("\n*\n* ERROR \n*\n Error en el Memory Manager \nNo se cargo el proceso  {pid}".format(
+        #        pid=str(pid)))
+        return self._VSA.getPageTable(pid)
+
+    def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage):
+
+        #pageTable = self._pageTable[pid]
+        #pageTable[pageIDToPutInMemory] = frameOfPage
+        self._VSA.completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage)
 
     def NumberOfFreeMemCells(self):
         return len(self._freeFrames) * HARDWARE.mmu.frameSize
@@ -603,39 +628,73 @@ class MemoryManager:
     def allocFrames(self, cantOfFramesRequired):
 
         if cantOfFramesRequired > len(self.freeFrames):
-            raise Exception("\n*\n* ERROR \n*\n  Out of memory Exception \nCantidad de frames disponibles: {freeFrames}"
-                            "\nCantidad de frames solicitados: {framesRequired}"
-                            .format(freeFrames=len(self._freeFrames), framesRequired=cantOfFramesRequired))
+            #raise Exception("\n*\n* ERROR \n*\n  Out of memory Exception \nCantidad de frames disponibles: {freeFrames}"
+            #                "\nCantidad de frames solicitados: {framesRequired}"
+            #                .format(freeFrames=len(self._freeFrames), framesRequired=cantOfFramesRequired))
+
+            victimFrameToSWAP = self._VSA.selectVictimUsing()
+            instructionsOfTheFrame = HARDWARE.mmu.getInstructionsOfFrame(victimFrameToSWAP)
+            self._kernel.fileSystem.swap(victimFrameToSWAP, instructionsOfTheFrame)#pongo la pag en la memoria virtual
+            self.freeTheFrames(victimFrameToSWAP)#libero el frame de la pag que fue puesta en memoria virtual(ya puede ser usada)
+            return self._getFreeFrames(cantOfFramesRequired)
+
+        # no tirar error, hay que seleccionar victima y hacer el SWAP, deberia tener un OBJ con el
+        # algoritmo que se encargue de la seleccion
         else:
-            if cantOfFramesRequired == 0:
-                listWithFreeFrames = self._freeFrames[:1]
-                self._freeFrames = self._freeFrames[1:]
+            #listWithFreeFrames = self._freeFrames[:cantOfFramesRequired]
+            #self._freeFrames = self._freeFrames[cantOfFramesRequired:]
+            #return listWithFreeFrames
 
-                return listWithFreeFrames
-            else:
-                listWithFreeFrames = self._freeFrames[:cantOfFramesRequired]
-                self._freeFrames = self._freeFrames[cantOfFramesRequired:]
+            return self._getFreeFrames(cantOfFramesRequired)
 
-                return listWithFreeFrames
+    def _getFreeFrames(self,cantOfFramesRequired):
+
+        listWithFreeFrames = self._freeFrames[:cantOfFramesRequired]
+        self._freeFrames = self._freeFrames[cantOfFramesRequired:]
+
+        return listWithFreeFrames
 
     def freeTheFrames(self, releasedFrames):
-        self._freeFrames.extend(releasedFrames)
+        self._freeFrames.append(releasedFrames)
 
 
 class FileSystem:
 
-    def __init__(self):
+    def __init__(self, kernel):
         self._fileSystem = dict()
+        self._virtualMem = VirtualMemory(HARDWARE.memory.size // HARDWARE.mmu.frameSize, kernel)
 
     def write(self, path, program):
         self._fileSystem[path] = program
 
     def read(self, path):
-
         if path in self._fileSystem:
             return self._fileSystem[path]
         else:
             raise Exception("-- the path does not exist.")
+
+    def swap(self, aVictimFrameToSwap, aListOfInstructions):
+        self._virtualMem.savePage((aVictimFrameToSwap, aListOfInstructions))
+
+class VirtualMemory:
+
+    def __init__(self, aNumberOfFrames, aKernel):
+        self._kernel = aKernel
+        self._virtualMemory = dict()
+        for x in range(0, aNumberOfFrames):
+            self._virtualMemory[x] = ""
+
+    def savePage(self, aPair):
+        key = self._firstEmptyKey()
+        self._virtualMemory[key] = aPair
+        return key
+
+    def _firstEmptyKey(self):
+        for key in self._virtualMemory:
+            if self._virtualMemory[key] == "":
+                return key
+        raise Exception("\nLa Memoria Virtual esta llena")
+
 
 # -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 

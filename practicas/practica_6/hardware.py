@@ -7,7 +7,8 @@ import log
 
 ##  Estas son la instrucciones soportadas por nuestro CPU
 INSTRUCTION_IO = 'IO'
-INSTRUCTION_CPU = 'CPU'
+INSTRUCTION_CPU_WRITE = 'CPU_WRITE'
+INSTRUCTION_CPU_READ = 'CPU_READ'
 INSTRUCTION_EXIT = 'EXIT'
 
 
@@ -23,8 +24,16 @@ class ASM():
         return INSTRUCTION_IO
 
     @classmethod
-    def CPU(self, times):
-        return [INSTRUCTION_CPU] * times
+    def CPU_WRITE(self, times):
+        return [INSTRUCTION_CPU_WRITE] * times
+
+    @classmethod
+    def CPU_READ(self, times):
+        return [INSTRUCTION_CPU_READ] * times
+
+    @classmethod
+    def isCPU_WRITE(self, instruction):
+        return INSTRUCTION_CPU_WRITE == instruction
 
     @classmethod
     def isEXIT(self, instruction):
@@ -212,6 +221,15 @@ class MMU():
 
         # obtenemos la instrucción alocada en esa direccion
         return self._memory.read(physicalAddress)
+
+    def getInstructionsOfFrame(self, aFrameID):
+        instructionsOfTheFrame = []
+        frameBaseDir = aFrameID * self._frameSize
+        for offset in range(0, self._frameSize):
+            instr = self._memory.read(frameBaseDir + offset)
+            instructionsOfTheFrame.append(instr)
+
+        return instructionsOfTheFrame
 
 
 ## emulates the main Central Processor Unit
