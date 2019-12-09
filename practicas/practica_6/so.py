@@ -189,7 +189,7 @@ class NewInterruptionHandler(AbstractInterruptionHandler):
         self.pcbIn(pcb)
 
         log.logger.info("\n Executing program: {name}".format(name=pcb.path))
-        log.logger.info(HARDWARE)
+        #log.logger.info(HARDWARE)
 
 
 class TimeOutInterruptionHandler(AbstractInterruptionHandler):
@@ -609,14 +609,14 @@ class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
     def selectVictim(self):
         return self._victimQueue.pop(0)
 
-class LRUAlgorithm(VictimSelectionAlgorithmAbstract):
+class SecondChanceAlgorithm(VictimSelectionAlgorithmAbstract):
 
     def __init__(self):
-        super(LRUAlgorithm, self).__init__()
+        super(SecondChanceAlgorithm, self).__init__()
         self._aguja = None
 
     def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameOfPage, aBoolean):
-        super(LRUAlgorithm,self).completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage, aBoolean)
+        super(SecondChanceAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameOfPage, aBoolean)
 
         if self._aguja is None:
             self._aguja = (pid, pageIDToPutInMemory)
