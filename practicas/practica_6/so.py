@@ -433,7 +433,8 @@ class Loader():
     def loadPageOfPCB(self, pageIDToPutInMemory, pcb):
         pcbProgram = self._kernel.fileSystem.read(pcb.path)
         instructionsOfPageWithID = self.__instructionsOfPage(pageIDToPutInMemory, pcbProgram)
-        framesToUseID = self._kernel.memoryManager.allocFrames(1)
+        framesToUseID = self._kernel.memoryManager.pageInVirtualMem(instructionsOfPageWithID)
+        #framesToUseID = self._kernel.memoryManager.allocFrames(1)
 
         frameOfPage = None
         for instructionNumber in range(0, len(instructionsOfPageWithID)):
@@ -703,13 +704,18 @@ class MemoryManager:
     def NumberOfFreeMemCells(self):
         return len(self._freeFrames) * HARDWARE.mmu.frameSize
 
+    def pageInVirtualMem(self, instructionsOfPage):
+        if self._kernel.fileSystem.virtualMem.isInVirtualMemory(instructionsOfPage):
+            self._kernel.fileSystem.swapIn(instructionsOfPage)
+        return self.allocFrames(1)
+
     def allocFrames(self, cantOfFramesRequired):
 
         if cantOfFramesRequired > len(self.freeFrames):
 
             victimFrameToSWAP = self._VSA.selectVictim()
             instructionsOfTheFrame = HARDWARE.mmu.getInstructionsOfFrame(victimFrameToSWAP)
-            self._kernel.fileSystem.swap(victimFrameToSWAP, instructionsOfTheFrame)#pongo la pag en la memoria virtual
+            self._kernel.fileSystem.swapOut(victimFrameToSWAP, instructionsOfTheFrame)#pongo la pag en la memoria virtual
             self.freeTheFrames(victimFrameToSWAP)#libero el frame de la pag que fue puesta en memoria virtual(ya puede ser usada)
             return self._getFreeFrames(cantOfFramesRequired)
 
@@ -734,6 +740,9 @@ class FileSystem:
         self._fileSystem = dict()
         self._virtualMem = VirtualMemory(HARDWARE.memory.size // HARDWARE.mmu.frameSize, kernel)
 
+    def virtualMem(self):
+        return self._virtualMem
+
     def write(self, path, program):
         self._fileSystem[path] = program
 
@@ -743,8 +752,15 @@ class FileSystem:
         else:
             raise Exception("-- the path does not exist.")
 
-    def swap(self, aVictimFrameToSwap, aListOfInstructions):
+    def swapOut(self, aVictimFrameToSwap, aListOfInstructions):
         self._virtualMem.savePage((aVictimFrameToSwap, aListOfInstructions))
+
+    def swapIn(self, instructionsOfPage):
+        self._virtualMem.removePage(instructionsOfPage)
+
+        #return self._virtualMem.kernel.memoryManager.allocFrames(1)
+
+        #self._virtualMem.kernel.loader.loadPageOfPCB(pageID, pcbOfPage)
 
 class VirtualMemory:
 
@@ -765,6 +781,17 @@ class VirtualMemory:
                 return key
         raise Exception("\nLa Memoria Virtual esta llena")
 
+    def removePage(self, instructionsOfPage):
+        for key in self._virtualMemory:
+            if self._virtualMemory[key] == instructionsOfPage:
+                del self._virtualMemory[key]
+
+    def isInVirtualMemory(self, instructionsOfPage):
+        return instructionsOfPage in self._virtualMemory.values()
+        #for key in self._virtualMemory:
+        #    if self._virtualMemory[key] == instructionsOfPage:
+        #        return True
+        #return False
 
 # -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 
