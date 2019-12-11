@@ -460,7 +460,7 @@ class Loader():
 
 
     def loadNewPageTableOf(self, pcb):
-        self._kernel.memoryManager.putPageTable(pcb.pid,  dict())
+        self._kernel.memoryManager.putPageTable(pcb.pid, dict())
 
     def __instructionsOfPage(self, pageIDToPutInMemory, pcbProgram):
         instructions = pcbProgram.instructions
@@ -705,7 +705,7 @@ class MemoryManager:
         return len(self._freeFrames) * HARDWARE.mmu.frameSize
 
     def pageInVirtualMem(self, instructionsOfPage):
-        if self._kernel.fileSystem.virtualMem.isInVirtualMemory(instructionsOfPage):
+        if self._kernel.fileSystem.pageIsInVirtualMemory(instructionsOfPage):
             self._kernel.fileSystem.swapIn(instructionsOfPage)
         return self.allocFrames(1)
 
@@ -761,6 +761,10 @@ class FileSystem:
         #return self._virtualMem.kernel.memoryManager.allocFrames(1)
 
         #self._virtualMem.kernel.loader.loadPageOfPCB(pageID, pcbOfPage)
+
+    def pageIsInVirtualMemory(self, instructionsOfPage):
+        return self._virtualMem.isInVirtualMemory(instructionsOfPage)
+
 
 class VirtualMemory:
 
