@@ -23,8 +23,8 @@ if __name__ == '__main__':
 
     #creamos el algorithmo con el que se seleccionara la victima para poder realizar el SWAP
     #algorithm = FifoAlgorithm()
-    algorithm = SecondChanceAlgorithm()
-    #algorithm = LRUAlgorithm() #LRU = least recently used
+    #algorithm = SecondOportunityAlgorithm()
+    algorithm = LRUAlgorithm() #LRU = least recently used
 
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo con el scheduler y el algoritmo a utilizar

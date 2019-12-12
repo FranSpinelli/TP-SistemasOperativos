@@ -187,7 +187,7 @@ class NewInterruptionHandler(AbstractInterruptionHandler):
         self.pcbIn(pcb)
 
         log.logger.info("\n Executing program: {name}".format(name=pcb.path))
-        #log.logger.info(HARDWARE)
+
 
 
 class TimeOutInterruptionHandler(AbstractInterruptionHandler):
@@ -218,6 +218,7 @@ class PageFaultInterruptionHandler(AbstractInterruptionHandler):
         pcb = self.kernel.pcbTable.runningPCB
 
         self.kernel.loader.loadPageOfPCB(pageIDToPutInMemory, pcb)
+        log.logger.info(HARDWARE)
 
 class CpuWriteInterruptionHandler(AbstractInterruptionHandler):
 
@@ -604,6 +605,7 @@ class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
     def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameIDOfPage, aBoolean):
         super(FifoAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage, aBoolean)
         self._victimQueue.append(frameIDOfPage)
+        log.logger.info("victim Queue state= {victimQueue}".format(victimQueue=self._victimQueue))
 
     def selectVictim(self):
         return self._victimQueue.pop(0)
@@ -620,9 +622,11 @@ class LRUAlgorithm(VictimSelectionAlgorithmAbstract):
         if frameIDOfPage in self._victimQueue:
             self._victimQueue.remove(frameIDOfPage)
         self._victimQueue.append(frameIDOfPage)
+        log.logger.info("victim Queue state= {victimQueue}".format(victimQueue= self._victimQueue))
 
     def selectVictim(self):
-        return self._victimQueue.pop(0)
+        victim = self._victimQueue.pop(0)
+        return victim
 
 
 class SecondOportunityAlgorithm(VictimSelectionAlgorithmAbstract):
@@ -645,7 +649,7 @@ class SecondOportunityAlgorithm(VictimSelectionAlgorithmAbstract):
 
             log.logger.info("process id de aguja={physicalAddr}".format(physicalAddr=self._aguja[0]))
             log.logger.info("pagina de la aguja ={physicalAddr}".format(physicalAddr=self._aguja[1]))
-            log.logger.info("tupla=({p1}, {p2})".format(p1=tupleWithAguja[0], p2=tupleWithAguja[1]))
+            log.logger.info("tupla=(FrameID: {p1}, Fue escrito: {p2})".format(p1=tupleWithAguja[0], p2=tupleWithAguja[1]))
 
             if tupleWithAguja[1]:
                 self.completePageTableOfWith(self._aguja[0], self._aguja[1], tupleWithAguja[0], False)
