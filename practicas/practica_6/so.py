@@ -219,6 +219,7 @@ class PageFaultInterruptionHandler(AbstractInterruptionHandler):
 
         self.kernel.loader.loadPageOfPCB(pageIDToPutInMemory, pcb)
         log.logger.info(HARDWARE)
+        log.logger.info(self.kernel.fileSystem.virtualMem())
 
 class CpuWriteInterruptionHandler(AbstractInterruptionHandler):
 
@@ -449,26 +450,15 @@ class Loader():
             self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameToUseID, False)
 
     def loadInstructionsUsingFrame(self, instructions, aFrame):
-        frameOfPage = None
         for instructionNumber in range(0, len(instructions)):
-            ##calculamos la pagina y el offset correspondiente a la instruccion correspondiente
-            #pageId = instructionNumber // HARDWARE.mmu.frameSize
+            ##calculamos el offset correspondiente a la instruccion correspondiente
             offset = instructionNumber % HARDWARE.mmu.frameSize
-
-            ##buscamos el frame correspondiente a la pagina calculada para dicha pagina
-            #try:
-            #    frameId = aFrame
-            #except:
-            #    raise Exception("ERROR \n algo salio mal en el loader")
 
             ##calculamos la direccion fisica resultante
             frameBaseDir = HARDWARE.mmu.frameSize * aFrame
             physicalAddress = frameBaseDir + offset
 
-            #frameOfPage = frameId  # hago esto por que en linea 459 no detecta que el frameId fue declarado en el try
-
             HARDWARE.memory.write(physicalAddress, instructions[instructionNumber])
-            #return frameOfPage
 
     def loadNewPageTableOf(self, pcb):
         self._kernel.memoryManager.putPageTable(pcb.pid, dict())
@@ -804,7 +794,7 @@ class VirtualMemory:
         self._kernel = aKernel
         self._virtualMemory = dict()
         for x in range(0, aNumberOfFrames):
-            self._virtualMemory[x] = ""
+            self._virtualMemory[x] = ("","")
 
     def savePage(self, aTuple):
         key = self._firstEmptyKey()
@@ -816,7 +806,7 @@ class VirtualMemory:
 
     def _firstEmptyKey(self):
         for key in self._virtualMemory:
-            if self._virtualMemory[key] == "":
+            if (self._virtualMemory[key][0] == "") & (self._virtualMemory[key][1] == ""):
                 return key
         raise Exception("\nLa Memoria Virtual esta llena")
 
@@ -825,6 +815,14 @@ class VirtualMemory:
             if self._virtualMemory[key] == instructionsOfPage:
                 del self._virtualMemory[key]
 
+    def __repr__(self):
+
+        lista = []
+        for key in list(self._virtualMemory.keys()):
+            tuple = self._virtualMemory[key]
+            lista.append([key, tuple[0], tuple[1]])
+
+        return tabulate(lista,headers=["key", "data", "state"], tablefmt='grid', stralign='center')
 # -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 
 class GantGraficator():
