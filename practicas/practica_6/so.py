@@ -219,21 +219,30 @@ class PageFaultInterruptionHandler(AbstractInterruptionHandler):
 
         self.kernel.loader.loadPageOfPCB(pageIDToPutInMemory, pcb)
         log.logger.info(HARDWARE)
-        log.logger.info(self.kernel.fileSystem.virtualMem())
+        log.logger.info(self.kernel.fileSystem.virtualMemory())
 
 class CpuWriteInterruptionHandler(AbstractInterruptionHandler):
 
     def execute(self, irq):
-        pcbID = self.kernel.pcbTable.runningPCB.pid
-        logicalAddress = irq.parameters
-        pageID = logicalAddress // HARDWARE.mmu.frameSize
+        pcb = self.kernel.pcbTable.runningPCB
+        dataToWrite = irq.parameters
 
-        pcbPageTable = self.kernel.memoryManager.getPageTable(pcbID)
-        pageIDTuple = pcbPageTable[pageID]
+        firstFreeStackId = self.kernel.memoryManager.firstFreeStackId(pcb)
 
-        self.kernel.memoryManager.completePageTableOfWith(pcbID, pageID, pageIDTuple[0], True)
+        if firstFreeStackId is None:
+            log.logger.info("no habia stack creado")
+            self.kernel.loader.loadNewStack(pcb, dataToWrite)
+
+        else:
+            log.logger.info("habia stack creado")
+            pageTable = self.kernel.memoryManager.getPageTable(pcb.pid)
+            tuple = pageTable[firstFreeStackId]
+
+            self.kernel.loader.addNewDataToTheStack(dataToWrite, tuple[0])
 
 
+        log.logger.info(HARDWARE)
+        log.logger.info(self.kernel.fileSystem.virtualMemory())
 
 # emulates the core of an Operative System
 class Kernel():
@@ -335,6 +344,17 @@ class Pcb():
         self._path = unPath
         self._state = READY_PCB_STATE
         self._priority = priority
+        self._stacks = 0
+
+    @property
+    def stacks(self):
+        return self.stacks
+
+    def getStackID(self):
+        respsta = self._stacks
+        self._stacks += 1
+        return respsta
+
 
     @property
     def priority(self):
@@ -449,7 +469,61 @@ class Loader():
             self.loadInstructionsUsingFrame(instructionsOfPageWithID, frameToUseID)
             self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameToUseID, False)
 
+    def loadStackOfPCBFromVirtualMem(self, pageID, pcb):
+        #calculo la tupla instr-estado de una pagina que esta en la virtual mem, y la elimino de esta
+        tuple = self._kernel.fileSystem.swapIn(pageID % 10)
+
+        # tomo un frame para poder guardar las instrucciones
+        frameToUseID = self._kernel.memoryManager.allocFrames(1)[0]
+
+        pageAndPID = self._kernel.memoryManager.pageIdAndPIDOf(frameToUseID)
+
+        log.logger.info("pagina del frame a sacar= {a}".format(a=pageAndPID[0]))
+
+        if int(str(pageAndPID[0])[:3]) == 999: #es un stack y hay que persistirlo
+            log.logger.info("es un stack y hay que swapear")
+
+            pageTable = self._kernel.memoryManager.getPageTable(pageAndPID[1])
+            state = pageTable[pageAndPID[0]][1]
+            instructionsOfTheFrame = HARDWARE.mmu.getInstructionsOfFrame(frameToUseID)
+
+            nuevaFrameID = self._kernel.fileSystem.swapOut((instructionsOfTheFrame, state[1]))
+            self._kernel.memoryManager.completePageTableOfWith(pageAndPID[1], pageAndPID[0], nuevaFrameID, state[1])
+
+        #pongo la data en la mem, actualizo la informacion de la page table
+        self._kernel.loader.loadInstructionsUsingFrame(tuple[0], frameToUseID)
+        self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageID, frameToUseID, tuple[1])
+
+        #libero la virtual mem
+        self._kernel.fileSystem._virtualMem.removePage(pageID % 10)
+
+    def loadNewStack(self, pcb, data):
+
+        id = pcb.getStackID()
+        idToUse = int(str(999) + str(id))
+
+        frameToUse = self._kernel.memoryManager.allocFrames(1)[0]
+        self.loadInstructionsUsingFrame([data], frameToUse)
+        self._kernel.memoryManager.completePageTableOfWith(pcb.pid, idToUse, frameToUse, True)
+
+    def addNewDataToTheStack(self, dataToWrite, frame):
+
+        instructions = HARDWARE.mmu.getInstructionsOfFrame(frame)
+        instruccionesFinales = []
+
+        for instruct in instructions:
+            if instruct != "":
+                instruccionesFinales.append(instruct)
+
+        instruccionesFinales.append(dataToWrite)
+
+        self.loadInstructionsUsingFrame(instruccionesFinales, frame)
+
     def loadInstructionsUsingFrame(self, instructions, aFrame):
+
+        while len(instructions) < 4:
+            instructions.append("")
+
         for instructionNumber in range(0, len(instructions)):
             ##calculamos el offset correspondiente a la instruccion correspondiente
             offset = instructionNumber % HARDWARE.mmu.frameSize
@@ -596,16 +670,47 @@ class VictimSelectionAlgorithmAbstract:
     def getPageAndPIDOf(self, aFrame):
 
         for pid in self._pageTable.keys():
-
             pageTable = self._pageTable[pid]
             for pag in pageTable.keys():
-
                 if pageTable[pag][0] == aFrame:
                     return (pag, pid)
         log.logger.info("no se esta usando el frame: {frame}".format(frame = aFrame))
 
+    def firstFreeStackId(self, pcb, kernel):
+        aFileSystemToWorkWith = kernel.fileSystem
+
+        pageTable = self.getPageTable(pcb.pid)
+
+        for pageID in pageTable.keys():
+
+            log.logger.info("pageID={a}".format(a = pageID))
+
+            if int(str(pageID)[:3]) == 999: #quiere decir que es un stack
+                log.logger.info("es un stack")
+                tuple = pageTable[pageID]
+                log.logger.info("tuple={a}".format(a=tuple[0]))
+                if int(str(tuple[0])[:3]) == 111: #quiere decir que el stack esta en la virtual mem
+                    log.logger.info("que esta en virtual mem")
+
+                    if aFileSystemToWorkWith.virtualMem.numberOfCellsUsedOfFrame(tuple[0] % 10) < 4: #quiere decir que el stack de la virtual mem se puede seguir usando
+                        #len(aFileSystemToWorkWith.virtualMem().getPage(tuple[0] % 10)[0]) < 4:
+
+                        log.logger.info("y se puede seguir usando")
+                        # carguo el stack que puede ser usado en la memoria principal y retorno la pageID para que lo utilize el handler
 
 
+                        kernel.loader.loadStackOfPCBFromVirtualMem(pageID, pcb)
+
+                        return pageID
+
+                else:#no esta en virtualMem
+                    log.logger.info("que esta en principal mem")
+
+                    if HARDWARE.mmu.numberOfcellsUsedOfFrame(tuple[0]) < 4:
+                        log.logger.info("y se puede seguir usando")
+                        return pageID
+        log.logger.info("no encontro nada")
+        return None
 
     def selectVictim(self):
         log.logger.error(
@@ -737,16 +842,16 @@ class MemoryManager:
 
             pageAndPIDOfFrame = self._VSA.getPageAndPIDOf(victimFrameToSWAP)
 
-            estado = self._VSA.getPageTable(pageAndPIDOfFrame[1])[pageAndPIDOfFrame[0]][1]
-            newPageLocation = self._kernel.fileSystem.swapOut((instructionsOfTheFrame, estado))#pongo la pag en la memoria virtual
+            if int(str(pageAndPIDOfFrame[0])[:3]) == 999:
 
-            self._VSA.completePageTableOfWith(pageAndPIDOfFrame[1], pageAndPIDOfFrame[0], newPageLocation, estado)
+                estado = self._VSA.getPageTable(pageAndPIDOfFrame[1])[pageAndPIDOfFrame[0]][1]
+                newPageLocation = self._kernel.fileSystem.swapOut((instructionsOfTheFrame, estado))#pongo la pag en la memoria virtual
+
+                self._VSA.completePageTableOfWith(pageAndPIDOfFrame[1], pageAndPIDOfFrame[0], newPageLocation, estado)
 
             self.freeTheFrames(victimFrameToSWAP)#libero el frame de la pag que fue puesta en memoria virtual(ya puede ser usada)
             return self._getFreeFrames(cantOfFramesRequired)
-
         else:
-
             return self._getFreeFrames(cantOfFramesRequired)
 
     def isPageOfPCBInVirtualMemory(self, aPageID, aPID):
@@ -762,7 +867,11 @@ class MemoryManager:
     def freeTheFrames(self, releasedFrames):
         self._freeFrames.append(releasedFrames)
 
+    def firstFreeStackId(self, pcb):
+        return self._VSA.firstFreeStackId(pcb, self._kernel)
 
+    def pageIdAndPIDOf(self, aFrame):
+        return self._VSA.getPageAndPIDOf(aFrame)
 class FileSystem:
 
     def __init__(self, kernel):
@@ -770,7 +879,11 @@ class FileSystem:
         self._fileSystem = dict()
         self._virtualMem = VirtualMemory(HARDWARE.memory.size // HARDWARE.mmu.frameSize, kernel)
 
+    @property
     def virtualMem(self):
+        return self._virtualMem
+
+    def virtualMemory(self):
         return self._virtualMem
 
     def write(self, path, program):
@@ -810,10 +923,19 @@ class VirtualMemory:
                 return key
         raise Exception("\nLa Memoria Virtual esta llena")
 
-    def removePage(self, instructionsOfPage):
+    def numberOfCellsUsedOfFrame(self, aKey):
+        instructionsOfPage = self.getPage(aKey)[0]
+        contador = 0
+
+        for instr in instructionsOfPage:
+            if instr != "":
+                contador += 1
+        return contador
+
+    def removePage(self, aKey):
         for key in self._virtualMemory:
-            if self._virtualMemory[key] == instructionsOfPage:
-                del self._virtualMemory[key]
+            if key == aKey:
+                self._virtualMemory[key] = ("","")
 
     def __repr__(self):
 

@@ -7,13 +7,25 @@ import log
 
 ##  Estas son la instrucciones soportadas por nuestro CPU
 INSTRUCTION_IO = 'IO'
-INSTRUCTION_CPU_WRITE = 'CPU_WRITE'
 INSTRUCTION_CPU_READ = 'CPU_READ'
+INSTRUCTION_CPU_WRITE = 'CPU_WRITE'
 INSTRUCTION_EXIT = 'EXIT'
 
+class CPU_WRITE:
+
+    def __init__(self, parameters=None):
+        self._type = type
+        self._parameters = parameters
+
+    @property
+    def parameters(self):
+        return self._parameters
+
+    def __repr__(self):
+        return INSTRUCTION_CPU_WRITE
 
 ## Helper for emulated machine code
-class ASM():
+class ASM:
 
     @classmethod
     def EXIT(self, times):
@@ -24,8 +36,8 @@ class ASM():
         return INSTRUCTION_IO
 
     @classmethod
-    def CPU_WRITE(self, times):
-        return [INSTRUCTION_CPU_WRITE] * times
+    def CPU_WRITE(self, data=None):
+        return [CPU_WRITE(data)]
 
     @classmethod
     def CPU_READ(self, times):
@@ -33,7 +45,8 @@ class ASM():
 
     @classmethod
     def isCPU_WRITE(self, instruction):
-        return INSTRUCTION_CPU_WRITE == instruction
+
+        return CPU_WRITE().__repr__() == instruction.__repr__()
 
     @classmethod
     def isEXIT(self, instruction):
@@ -226,6 +239,16 @@ class MMU():
 
         return instructionsOfTheFrame
 
+    def numberOfcellsUsedOfFrame(self, frameId):
+
+        instrucciones = self.getInstructionsOfFrame(frameId)
+        contador = 0
+
+        for instruction in instrucciones:
+            if instruction != "":
+                contador += 1
+        return contador
+
 ## emulates the main Central Processor Unit
 class Cpu():
 
@@ -259,7 +282,7 @@ class Cpu():
             ioInIRQ = IRQ(IO_IN_INTERRUPTION_TYPE, self._ir)
             self._interruptVector.handle(ioInIRQ)
         elif ASM.isCPU_WRITE(self._ir):
-            cpuWriteIRQ = IRQ(CPU_WRITE_INTERRUPTION_TYPE,self._pc)
+            cpuWriteIRQ = IRQ(CPU_WRITE_INTERRUPTION_TYPE,self._ir.parameters)
             self._interruptVector.handle(cpuWriteIRQ)
         else:
             log.logger.info("cpu - Exec: {instr}, PC={pc}".format(instr=self._ir, pc=self._pc))

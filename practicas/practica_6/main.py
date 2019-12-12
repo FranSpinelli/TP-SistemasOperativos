@@ -16,14 +16,14 @@ if __name__ == '__main__':
     HARDWARE.switchOn()
 
     ##creamos el scheduler con el que vamos a trabajar
-    #scheduler = RoundRobinScheduler(3)
-    scheduler = FCFSScheduler()
+    scheduler = RoundRobinScheduler(3)
+    #scheduler = FCFSScheduler()
     #scheduler = PriorityPreemtiveScheduler()
     #scheduler = PriorityNoPreemtiveScheduler()
 
     #creamos el algorithmo con el que se seleccionara la victima para poder realizar el SWAP
-    #algorithm = FifoAlgorithm()
-    algorithm = SecondOportunityAlgorithm()
+    algorithm = FifoAlgorithm()
+    #algorithm = SecondOportunityAlgorithm()
     #algorithm = LRUAlgorithm() #LRU = least recently used
 
     ## new create the Operative System Kernel
@@ -45,9 +45,9 @@ if __name__ == '__main__':
     #prg2 = Program("prg2.exe", [ASM.CPU_READ(10)])
     #prg3 = Program("prg3.exe", [ASM.CPU_READ(10)])
 
-    prg1 = Program("prg1.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
-    prg2 = Program("prg2.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
-    prg3 = Program("prg3.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
+    prg1 = Program("prg1.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE("hello World 1"), ASM.CPU_READ(4), ASM.CPU_WRITE("hello World 2")])
+    prg2 = Program("prg2.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE("hello World 3"), ASM.CPU_READ(4), ASM.CPU_WRITE("hello World 4")])
+    prg3 = Program("prg3.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE("hello World 5"), ASM.CPU_READ(4), ASM.CPU_WRITE("hello World 6")])
     #----------------------------------------------------------------------------------------------------
 
     #write programs in the fileSystem
