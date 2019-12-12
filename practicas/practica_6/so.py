@@ -3,7 +3,7 @@ import log
 
 
 ## emulates a compiled program
-class Program():
+class Program:
 
     def __init__(self, name, instructions):
         self._name = name
@@ -187,7 +187,7 @@ class NewInterruptionHandler(AbstractInterruptionHandler):
         self.pcbIn(pcb)
 
         log.logger.info("\n Executing program: {name}".format(name=pcb.path))
-        log.logger.info(HARDWARE)
+        #log.logger.info(HARDWARE)
 
 
 class TimeOutInterruptionHandler(AbstractInterruptionHandler):
@@ -458,7 +458,6 @@ class Loader():
 
         self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameOfPage, False)
 
-
     def loadNewPageTableOf(self, pcb):
         self._kernel.memoryManager.putPageTable(pcb.pid, dict())
 
@@ -595,7 +594,6 @@ class VictimSelectionAlgorithmAbstract:
     def selectVictim(self):
         log.logger.error(
             "-- selectVictim MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
-
 
 class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
 

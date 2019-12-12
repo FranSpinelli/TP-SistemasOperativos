@@ -22,9 +22,9 @@ if __name__ == '__main__':
     #scheduler = PriorityNoPreemtiveScheduler()
 
     #creamos el algorithmo con el que se seleccionara la victima para poder realizar el SWAP
-    algorithm = FifoAlgorithm()
+    #algorithm = FifoAlgorithm()
+    algorithm = SecondChanceAlgorithm()
     #algorithm = LRUAlgorithm() #LRU = least recently used
-    #algorithm = SecondOportunityAlgorithm()
 
     ## new create the Operative System Kernel
     # "booteamos" el sistema operativo con el scheduler y el algoritmo a utilizar
@@ -50,7 +50,6 @@ if __name__ == '__main__':
     prg3 = Program("prg3.exe", [ASM.CPU_READ(4), ASM.CPU_WRITE(1), ASM.CPU_READ(4), ASM.CPU_WRITE(1)])
     #----------------------------------------------------------------------------------------------------
 
-
     #write programs in the fileSystem
     kernel.fileSystem.write("C:/prg1.exe", prg1)
     kernel.fileSystem.write("C:/prg2.exe", prg2)
@@ -60,4 +59,3 @@ if __name__ == '__main__':
     kernel.run("C:/prg1.exe", 1)
     kernel.run("C:/prg2.exe", 2)
     kernel.run("C:/prg3.exe", 3)
-    #kernel.run("C:/prg1.exe", 1)
