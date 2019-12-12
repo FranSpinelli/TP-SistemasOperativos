@@ -434,30 +434,41 @@ class Loader():
     def loadPageOfPCB(self, pageIDToPutInMemory, pcb):
         pcbProgram = self._kernel.fileSystem.read(pcb.path)
         instructionsOfPageWithID = self.__instructionsOfPage(pageIDToPutInMemory, pcbProgram)
-        framesToUseID = self._kernel.memoryManager.pageInVirtualMem(instructionsOfPageWithID)
-        #framesToUseID = self._kernel.memoryManager.allocFrames(1)
+        frameToUseID = self._kernel.memoryManager.allocFrames(1)[0]
 
+        if self._kernel.memoryManager.isPageOfPCBInVirtualMemory(pageIDToPutInMemory, pcb.pid):
+            pageTable = self._kernel.memoryManager.getPageTable(pcb.pid)
+
+            locationInVirtualMem = pageTable[pageIDToPutInMemory] % 10
+            tupleWithInstructionsAndState = self._kernel.fileSystem.swapIn(locationInVirtualMem)
+
+            self._kernel.loader.loadInstructionsUsingFrame(tupleWithInstructionsAndState[0], frameToUseID)
+            self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameToUseID, tupleWithInstructionsAndState[1])
+        else:
+            self.loadInstructionsUsingFrame(instructionsOfPageWithID, frameToUseID)
+            self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameToUseID, False)
+
+    def loadInstructionsUsingFrame(self, instructions, aFrame):
         frameOfPage = None
-        for instructionNumber in range(0, len(instructionsOfPageWithID)):
+        for instructionNumber in range(0, len(instructions)):
             ##calculamos la pagina y el offset correspondiente a la instruccion correspondiente
-            pageId = instructionNumber // HARDWARE.mmu.frameSize
+            #pageId = instructionNumber // HARDWARE.mmu.frameSize
             offset = instructionNumber % HARDWARE.mmu.frameSize
 
             ##buscamos el frame correspondiente a la pagina calculada para dicha pagina
-            try:
-                frameId = framesToUseID[pageId]
-            except:
-                raise Exception("ERROR \n algo salio mal en el loader")
+            #try:
+            #    frameId = aFrame
+            #except:
+            #    raise Exception("ERROR \n algo salio mal en el loader")
 
             ##calculamos la direccion fisica resultante
-            frameBaseDir = HARDWARE.mmu.frameSize * frameId
+            frameBaseDir = HARDWARE.mmu.frameSize * aFrame
             physicalAddress = frameBaseDir + offset
 
-            frameOfPage = frameId
+            #frameOfPage = frameId  # hago esto por que en linea 459 no detecta que el frameId fue declarado en el try
 
-            HARDWARE.memory.write(physicalAddress, instructionsOfPageWithID[instructionNumber])
-
-        self._kernel.memoryManager.completePageTableOfWith(pcb.pid, pageIDToPutInMemory, frameOfPage, False)
+            HARDWARE.memory.write(physicalAddress, instructions[instructionNumber])
+            #return frameOfPage
 
     def loadNewPageTableOf(self, pcb):
         self._kernel.memoryManager.putPageTable(pcb.pid, dict())
@@ -471,14 +482,6 @@ class Loader():
                 instructionsOfPage.append(instructions[instructionNumber])
 
         return instructionsOfPage
-
-    def __framesNeeded(self, programSize):
-        result = (programSize // HARDWARE.mmu.frameSize)
-
-        if programSize % HARDWARE.mmu.frameSize > 0:
-            result += 1
-
-        return result
 
 class AbstractScheduler:
 
@@ -592,6 +595,28 @@ class VictimSelectionAlgorithmAbstract:
         pageTable = self._pageTable[pid]
         pageTable[pageIDToPutInMemory] = (frameOfPage, aBoolean)# the second value indicates if in the frame was a CPU_WRITE instruction
 
+    def isPageOfPCBInVirtualMemory(self, aPageID, aPID):
+        pageTable = self.getPageTable(aPID)
+        try:
+            frameOfPageID = pageTable[aPageID][0]
+        except:
+            return False
+        return 111 == int(str(frameOfPageID)[:3])
+
+    def getPageAndPIDOf(self, aFrame):
+
+        for pid in self._pageTable.keys():
+
+            pageTable = self._pageTable[pid]
+            for pag in pageTable.keys():
+
+                if pageTable[pag][0] == aFrame:
+                    return (pag, pid)
+        log.logger.info("no se esta usando el frame: {frame}".format(frame = aFrame))
+
+
+
+
     def selectVictim(self):
         log.logger.error(
             "-- selectVictim MUST BE OVERRIDEN in class {classname}".format(classname=self.__class__.__name__))
@@ -604,8 +629,11 @@ class FifoAlgorithm(VictimSelectionAlgorithmAbstract):
 
     def completePageTableOfWith(self, pid, pageIDToPutInMemory, frameIDOfPage, aBoolean):
         super(FifoAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage, aBoolean)
-        self._victimQueue.append(frameIDOfPage)
-        log.logger.info("victim Queue state= {victimQueue}".format(victimQueue=self._victimQueue))
+
+        if (self._victimQueue[-1:] != [frameIDOfPage]) & (int(str(frameIDOfPage)[:3]) != 111):
+            self._victimQueue.append(frameIDOfPage)
+            log.logger.info("victim Queue state= {victimQueue}".format(victimQueue=self._victimQueue))
+
 
     def selectVictim(self):
         return self._victimQueue.pop(0)
@@ -621,8 +649,12 @@ class LRUAlgorithm(VictimSelectionAlgorithmAbstract):
         super(LRUAlgorithm, self).completePageTableOfWith(pid, pageIDToPutInMemory, frameIDOfPage, aBoolean)
         if frameIDOfPage in self._victimQueue:
             self._victimQueue.remove(frameIDOfPage)
-        self._victimQueue.append(frameIDOfPage)
-        log.logger.info("victim Queue state= {victimQueue}".format(victimQueue= self._victimQueue))
+            self._victimQueue.append(frameIDOfPage)
+            log.logger.info("victim Queue state= {victimQueue}".format(victimQueue= self._victimQueue))
+
+        elif (self._victimQueue[-1:] != [frameIDOfPage]) & (int(str(frameIDOfPage)[:3]) != 111):
+            self._victimQueue.append(frameIDOfPage)
+            log.logger.info("victim Queue state= {victimQueue}".format(victimQueue=self._victimQueue))
 
     def selectVictim(self):
         victim = self._victimQueue.pop(0)
@@ -706,24 +738,29 @@ class MemoryManager:
     def NumberOfFreeMemCells(self):
         return len(self._freeFrames) * HARDWARE.mmu.frameSize
 
-    def pageInVirtualMem(self, instructionsOfPage):
-        if self._kernel.fileSystem.pageIsInVirtualMemory(instructionsOfPage):
-            self._kernel.fileSystem.swapIn(instructionsOfPage)
-        return self.allocFrames(1)
-
     def allocFrames(self, cantOfFramesRequired):
 
         if cantOfFramesRequired > len(self.freeFrames):
 
             victimFrameToSWAP = self._VSA.selectVictim()
             instructionsOfTheFrame = HARDWARE.mmu.getInstructionsOfFrame(victimFrameToSWAP)
-            self._kernel.fileSystem.swapOut(victimFrameToSWAP, instructionsOfTheFrame)#pongo la pag en la memoria virtual
+
+            pageAndPIDOfFrame = self._VSA.getPageAndPIDOf(victimFrameToSWAP)
+
+            estado = self._VSA.getPageTable(pageAndPIDOfFrame[1])[pageAndPIDOfFrame[0]][1]
+            newPageLocation = self._kernel.fileSystem.swapOut((instructionsOfTheFrame, estado))#pongo la pag en la memoria virtual
+
+            self._VSA.completePageTableOfWith(pageAndPIDOfFrame[1], pageAndPIDOfFrame[0], newPageLocation, estado)
+
             self.freeTheFrames(victimFrameToSWAP)#libero el frame de la pag que fue puesta en memoria virtual(ya puede ser usada)
             return self._getFreeFrames(cantOfFramesRequired)
 
         else:
 
             return self._getFreeFrames(cantOfFramesRequired)
+
+    def isPageOfPCBInVirtualMemory(self, aPageID, aPID):
+        return self._VSA.isPageOfPCBInVirtualMemory(aPageID, aPID)
 
     def _getFreeFrames(self,cantOfFramesRequired):
 
@@ -739,6 +776,7 @@ class MemoryManager:
 class FileSystem:
 
     def __init__(self, kernel):
+        self._kernel = kernel
         self._fileSystem = dict()
         self._virtualMem = VirtualMemory(HARDWARE.memory.size // HARDWARE.mmu.frameSize, kernel)
 
@@ -754,19 +792,11 @@ class FileSystem:
         else:
             raise Exception("-- the path does not exist.")
 
-    def swapOut(self, aVictimFrameToSwap, aListOfInstructions):
-        self._virtualMem.savePage((aVictimFrameToSwap, aListOfInstructions))
+    def swapOut(self, aTuple):
+        return self._virtualMem.savePage(aTuple)
 
-    def swapIn(self, instructionsOfPage):
-        self._virtualMem.removePage(instructionsOfPage)
-
-        #return self._virtualMem.kernel.memoryManager.allocFrames(1)
-
-        #self._virtualMem.kernel.loader.loadPageOfPCB(pageID, pcbOfPage)
-
-    def pageIsInVirtualMemory(self, instructionsOfPage):
-        return self._virtualMem.isInVirtualMemory(instructionsOfPage)
-
+    def swapIn(self, aLocationInVirtualMem):
+        return self._virtualMem.getPage(aLocationInVirtualMem)
 
 class VirtualMemory:
 
@@ -776,10 +806,13 @@ class VirtualMemory:
         for x in range(0, aNumberOfFrames):
             self._virtualMemory[x] = ""
 
-    def savePage(self, aPair):
+    def savePage(self, aTuple):
         key = self._firstEmptyKey()
-        self._virtualMemory[key] = aPair
-        return key
+        self._virtualMemory[key] = aTuple
+        return int(str(111)+str(key))#las pag que estan en la mem virtual tendran frames que comenzaran con "111"
+
+    def getPage(self, aKey):
+        return self._virtualMemory[aKey]
 
     def _firstEmptyKey(self):
         for key in self._virtualMemory:
@@ -791,13 +824,6 @@ class VirtualMemory:
         for key in self._virtualMemory:
             if self._virtualMemory[key] == instructionsOfPage:
                 del self._virtualMemory[key]
-
-    def isInVirtualMemory(self, instructionsOfPage):
-        return instructionsOfPage in self._virtualMemory.values()
-        #for key in self._virtualMemory:
-        #    if self._virtualMemory[key] == instructionsOfPage:
-        #        return True
-        #return False
 
 # -----------------------------------Graficador de diagrama de gant-----------------------------------------------------
 
