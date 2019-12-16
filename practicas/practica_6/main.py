@@ -16,7 +16,7 @@ if __name__ == '__main__':
     HARDWARE.switchOn()
 
     ##creamos el scheduler con el que vamos a trabajar
-    scheduler = RoundRobinScheduler(3)
+    scheduler = RoundRobinScheduler(3) #COMPORTAMIENTOS RAROS CON ESTE SCHEDULER
     #scheduler = FCFSScheduler()
     #scheduler = PriorityPreemtiveScheduler()
     #scheduler = PriorityNoPreemtiveScheduler()
